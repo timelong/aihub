@@ -18,6 +18,7 @@ from .openai_compat import OpenAICompatProvider
 
 class ModelScopeProvider(OpenAICompatProvider):
     kind = "modelscope"
+    public_url_refs = True     # 图片入参必须是公网可访问的 URL
 
     def __init__(self, conf: dict[str, Any]):
         super().__init__(conf)

@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import context as ctx
+from . import cos
 from . import logctx
 from . import providers, storage
 from . import tools as toolkit
@@ -253,6 +254,24 @@ def api_context() -> dict:
     }
 
 
+# ============================ 腾讯云 COS（临时图床）============================
+@app.get("/api/cos")
+def api_cos() -> dict:
+    return cos.status()
+
+
+@app.post("/api/cos/test")
+async def api_cos_test() -> dict:
+    """上传 → 预签名 → 下载 → 删除，验证 secretId/secretKey/region/bucket 是否可用。"""
+    try:
+        return await cos.self_test()
+    except cos.CosError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:  # noqa: BLE001
+        log.exception("COS 自检失败")
+        raise HTTPException(502, f"{type(e).__name__}: {e}")
+
+
 # ============================ 工具 ============================
 @app.get("/api/tools")
 def api_tools() -> dict:
@@ -468,7 +487,10 @@ async def api_image(req: ImageReq) -> dict:
                           if k not in ("images", "image_url", "size", "n")}))
         t0 = time.perf_counter()
         try:
-            urls = await prov.generate_image(model_id, req.prompt, req.params)
+            # 只认公网 URL 的服务商：参考图先经 COS 上传成临时预签名 URL，
+            # 退出这个 with 时（无论成功失败）临时对象立刻删除。
+            async with cos.public_refs(req.params, prov.public_url_refs) as p:
+                urls = await prov.generate_image(model_id, req.prompt, p)
         except Exception as e:  # noqa: BLE001
             log.error("出图失败 用时%.1fs: %s", time.perf_counter() - t0, e)
             storage.update_job(job["id"], status="failed", error=str(e))
@@ -506,21 +528,36 @@ async def api_video(req: VideoReq, bg: BackgroundTasks) -> dict:
                  meta.get("name") or model_id, model_id,
                  "有" if req.params.get("image_url") else "无", preview(req.prompt, 300),
                  preview({k: v for k, v in req.params.items() if k != "image_url"}))
+        # 视频是异步任务，上游可能过一会儿才来取图，所以临时对象不能马上删，
+        # 要留到轮询结束（成功/失败/超时）后由 _watch_video 删。
+        cos_keys: list[str] = []
+        params = req.params
         try:
-            remote = await prov.submit_video(model_id, req.prompt, req.params)
+            if prov.public_url_refs and any(
+                    is_data_url(u) for u in ref_images(req.params)):
+                params, cos_keys = await cos.upload_refs(req.params)
+            remote = await prov.submit_video(model_id, req.prompt, params)
         except Exception as e:  # noqa: BLE001
             log.error("视频提交失败: %s", e)
+            await cos.delete(cos_keys)
             storage.update_job(job["id"], status="failed", error=str(e))
             raise HTTPException(502, str(e))
         log.info("视频任务已受理 remote=%s，转后台轮询", remote)
         storage.update_job(job["id"], status="running", remote_id=remote)
-    bg.add_task(_watch_video, job["id"], prov.id, model_id, remote, req.model)
+    bg.add_task(_watch_video, job["id"], prov.id, model_id, remote, req.model, cos_keys)
     return storage.get_job(job["id"])
 
 
 async def _watch_video(jid: str, pid: str, model_id: str, remote: str,
-                       ref: str = "") -> None:
+                       ref: str = "", cos_keys: list[str] | None = None) -> None:
     logctx.set_ctx(job=jid, model=ref or f"{pid}/{model_id}")
+    try:
+        await _watch_video_inner(jid, pid, model_id, remote)
+    finally:
+        await cos.delete(cos_keys or [])   # 任务结束就删掉临时参考图
+
+
+async def _watch_video_inner(jid: str, pid: str, model_id: str, remote: str) -> None:
     prov = providers.build(pid)
     t0 = time.time()
     deadline = t0 + 60 * 30

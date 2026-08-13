@@ -281,6 +281,21 @@
         <div id="provList"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
+        <h3>☁️ 腾讯云 COS（临时图床）
+          <button style="float:right" onclick="testCos()">测试连接</button>
+        </h3>
+        <div id="cosStatus"></div>
+        <div class="hint" style="margin-top:8px">
+          阿里百炼图生视频、智谱 CogVideoX、魔搭图生图这些接口只认公网图片 URL。
+          配好后，本地上传的参考图会先传到 COS、取预签名 URL 给服务商，
+          任务结束（成功/失败/超时）立即删除对象。
+          密钥填在 <code>.env</code>（<code>COS_SECRET_ID</code> /
+          <code>COS_SECRET_KEY</code>），region、bucket 等填在下方 config.yaml 的
+          <code>cos</code> 段。
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
         <h3>⭐️ 默认模型</h3>
         <div class="row">
           <div class="col">
@@ -504,6 +519,35 @@ async function loadModels(){
     </div>`).join('');
   $('#cfgText').value = (await (await fetch('/api/config')).json()).content;
 }
+/* ---------- 腾讯云 COS ---------- */
+async function loadCos(){
+  const d = await (await fetch('/api/cos')).json();
+  const badge = d.configured ? '<span class="badge ok">已配置</span>'
+    : `<span class="badge no">${d.enabled===false?'已手动关闭':'未配置'}</span>`;
+  const rows = [
+    ['地域 region', d.region], ['存储桶 bucket', d.bucket],
+    ['SecretId', d.secret_id_masked], ['key 前缀', d.prefix],
+    ['预签名有效期', d.expire_seconds + ' 秒'], ['协议', d.scheme],
+  ];
+  $('#cosStatus').innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+      ${badge}
+      ${d.sdk_installed?'':'<span class="badge no">缺少 SDK：pip install cos-python-sdk-v5</span>'}
+      ${d.missing.length?`<span class="hint">缺少配置项：${d.missing.map(esc).join('、')}</span>`:''}
+    </div>
+    ${rows.map(([k,v])=>`<div style="display:flex;gap:10px;padding:3px 0;font-size:13px">
+        <span class="hint" style="width:120px">${k}</span>
+        <span>${esc(String(v||'—'))}</span></div>`).join('')}`;
+}
+async function testCos(){
+  toast('正在测试：上传 → 预签名 → 下载 → 删除…', 3000, 'ok');
+  const r = await fetch('/api/cos/test', {method:'POST'});
+  const d = await r.json();
+  if(!r.ok){ toast('COS 测试失败：'+(d.detail||''), 12000); return; }
+  d.ok ? ok(`✅ COS 可用：上传、预签名、下载、删除全部成功（有效期 ${d.expire_seconds}s）`, 8000)
+       : toast('上传成功但预签名 URL 下载失败：'+(d.detail||'')+'（检查桶权限/防盗链）', 12000);
+}
+
 /* ---------- 时间上下文 ---------- */
 async function loadContext(){
   const d = await (await fetch('/api/context')).json();
@@ -861,7 +905,8 @@ async function saveCfg(){
   const r = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({content:$('#cfgText').value})});
   if(!r.ok){ toast('保存失败：'+((await r.json()).detail||'')); return; }
-  await loadModels(); await loadContext(); toast('配置已保存并重载 ✅', 3000);
+  await loadModels(); await loadContext(); await loadCos();
+  toast('配置已保存并重载 ✅', 3000);
 }
 
 /* ---------- 日志管理 ---------- */
@@ -999,7 +1044,7 @@ function fsPick(){
   $('#fsMask').style.display='none';
 }
 
-loadModels(); loadConvs(); loadDirs(); loadTools(); loadContext(); updImgHint();
+loadModels(); loadConvs(); loadDirs(); loadTools(); loadContext(); loadCos(); updImgHint();
 </script>
 </body>
 </html>

@@ -143,9 +143,9 @@ BOCHA_API_KEY=       # 博查，国内直连
 ```
 
 - **图生图 / 图片编辑**：上传参考图（可多张）即从文生图切到图生图。
-  已支持：OpenAI 兼容接口（`/images/edits`）、火山方舟即梦 Seedream、
-  Gemini Flash Image、魔搭；阿里百炼与智谱的图生图要求公网图片 URL，
-  上传本地图会给出明确报错。
+  各家接口吃的格式不同，已分别适配：OpenAI 兼容接口走 `/images/edits` 上传文件、
+  火山方舟即梦与 Gemini 直接吃 base64、魔搭只认公网 URL（自动走下方 COS 临时图床）。
+  阿里百炼/智谱当前配置的是纯文生图模型，传参考图会给出明确提示。
   在 `config.yaml` 给模型加 `image_input: true` 后，界面会提示该模型支持图生图；
   个别兼容服务（如硅基流动）的图生图是在 `/images/generations` 传 `image` 字段，
   给该 provider 加 `image_edit_mode: json` 即可
@@ -159,6 +159,36 @@ BOCHA_API_KEY=       # 博查，国内直连
   - 有结果的（生成成功）→ 只从页面隐藏，记录和图片都保留，勾选「显示已隐藏」可找回并 ↩ 恢复
   - 没有结果的（失败、卡住）→ 记录真正删除
 - **保存目录可配置**：见下方「保存目录」一节
+
+**☁️ 腾讯云 COS（临时图床）**
+- 阿里百炼图生视频、智谱 CogVideoX、魔搭图生图这些接口**只认公网图片 URL**，不吃 base64。
+  本地上传的参考图会：**上传对象 → 取预签名 URL 交给服务商 → 任务结束立即删除对象**
+- 删除时机：出图是请求结束就删；视频是异步任务，等后台轮询出结果（成功/失败/超时）才删，
+  否则上游还没来取图就没了
+- 预签名有效期 `expire_seconds` 要覆盖生成耗时，默认 1800 秒（和视频轮询上限一致）
+- 「⚙️ 模型配置 → ☁️ 腾讯云 COS」页显示配置状态，**「测试连接」**会真跑一遍
+  上传 → 预签名 → 下载校验 → 删除，一次确认 4 个参数对不对
+- 密钥放 `.env`，其余放 `config.yaml`：
+
+```dotenv
+COS_SECRET_ID=
+COS_SECRET_KEY=
+```
+
+```yaml
+cos:
+  secret_id: ${COS_SECRET_ID}
+  secret_key: ${COS_SECRET_KEY}
+  region: ap-guangzhou          # 存储桶地域
+  bucket: my-bucket-1250000000  # 必须带 APPID
+  prefix: aihub/tmp/            # 临时对象 key 前缀
+  expire_seconds: 1800          # 预签名有效期(秒)
+  scheme: https
+  # enabled: false              # 显式关闭；不写则「配全了就自动启用」
+```
+
+- 依赖 `cos-python-sdk-v5`（已在 requirements.txt）。没装或没配全时，
+  只影响需要公网 URL 的那几个服务商，其它照常用
 
 **📁 保存目录（可配置）**
 - 图片与视频分别配置保存目录，在「⚙️ 模型配置 → 📁 保存目录」页设置
@@ -233,6 +263,7 @@ aihub/
 │   ├── tools.py             # 对话工具：联网搜索（Tavily/博查/Bing）、网页抓取
 │   ├── context.py           # 运行时上下文注入：当前时间/时区
 │   ├── logctx.py            # 日志上下文：让底层日志也带 job/conv/model
+│   ├── cos.py               # 腾讯云 COS 临时图床：上传/预签名/用完删除
 │   ├── storage.py           # SQLite：会话、消息、生成任务
 │   └── providers/
 │       ├── base.py          # 抽象基类 chat_stream / generate_image / submit_video / poll_video
@@ -279,6 +310,8 @@ class MyProvider(BaseProvider):
 | GET·PUT | `/api/defaults` | 读取 / 设置各能力的默认模型 |
 | GET | `/api/tools` | 可用工具清单（含当前搜索后端） |
 | GET | `/api/context` | 当前会注入给模型的时间上下文 |
+| GET | `/api/cos` | COS 配置状态（不含密钥） |
+| POST | `/api/cos/test` | COS 自检：上传→预签名→下载→删除 |
 | GET | `/api/logs?file=&q=&level=&lines=` | 查看 / 搜索日志 |
 | GET | `/api/logs/files` | 日志文件清单 + 当前保留天数 |
 | PUT | `/api/logs/config` | 设置保留天数（并立即清理） |

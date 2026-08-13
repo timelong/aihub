@@ -9,6 +9,7 @@ from .openai_compat import OpenAICompatProvider
 
 class ZhipuProvider(OpenAICompatProvider):
     kind = "zhipu"
+    public_url_refs = True     # 图片入参必须是公网可访问的 URL
 
     async def generate_image(self, model: str, prompt: str, params: dict) -> list[str]:
         self.require_key()

@@ -231,3 +231,225 @@
 2026-08-12 19:56:28-0700 WARNING [aihub:65099] 服务开始关闭 PID=65099。若你没有主动停止，通常是收到了外部信号（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。
 2026-08-12 19:56:28-0700 INFO  [uvicorn.error:65099] Application shutdown complete.
 2026-08-12 19:56:28-0700 INFO  [uvicorn.error:65099] Finished server process [65099]
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] AI Hub 启动 PID=88615 时区=CST +0800 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] 出图开始 模型=Qwen-Image 图生图(Qwen/Qwen-Image-Edit-2511) 尺寸=1328x1328 数量=1 参考图1张 prompt=加只猫 其它参数={} {job=11311c252a3e417f model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 客户端已创建 region=ap-guangzhou bucket=b-1250000000 {job=11311c252a3e417f model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 已上传 key=aihub/tmp/0bc7bcf3fa704c96bdb4b316fd2de5ba.png 大小=0.1KB 预签名有效期=1800s {job=11311c252a3e417f model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 已删除临时对象 key=aihub/tmp/0bc7bcf3fa704c96bdb4b316fd2de5ba.png {job=11311c252a3e417f model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:23:50+0800 ERROR [aihub:88615] 出图失败 用时0.0s: Expecting value: line 1 column 1 (char 0) {job=11311c252a3e417f model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:23:50+0800 WARNING [aihub:88615] POST /api/image → 502 5ms
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] 出图开始 模型=Qwen-Image 图生图(Qwen/Qwen-Image-Edit-2511) 尺寸=默认 数量=1 参考图1张 prompt=x 其它参数={} {job=4a9dd88403114a3c model=modelscope/x}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 已上传 key=aihub/tmp/519d135b1982403ab5b9fc6cb60fdc1e.png 大小=0.1KB 预签名有效期=1800s {job=4a9dd88403114a3c model=modelscope/x}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 已删除临时对象 key=aihub/tmp/519d135b1982403ab5b9fc6cb60fdc1e.png {job=4a9dd88403114a3c model=modelscope/x}
+2026-08-13 19:23:50+0800 ERROR [aihub:88615] 出图失败 用时0.0s: HTTP 500: {"error":"boom"} {job=4a9dd88403114a3c model=modelscope/x}
+2026-08-13 19:23:50+0800 WARNING [aihub:88615] POST /api/image → 502 2ms
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] 视频提交 模型=万相 2.2 图生视频(wan2.2-i2v-plus) 首帧图=有 prompt=动起来 参数={} {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:23:50+0800 INFO  [aihub.cos:88615] COS 已上传 key=aihub/tmp/454c5b7d55ad46a4b0b3c6958d60a3fc.png 大小=0.1KB 预签名有效期=1800s {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] 视频任务已受理 remote=v1，转后台轮询 {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:23:50+0800 INFO  [aihub:88615] POST /api/video → 200 3ms
+2026-08-13 19:23:56+0800 INFO  [aihub.provider:88615] [dashscope] 轮询 #1 状态=running 已等 6s task=v1 {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:02+0800 INFO  [aihub.provider:88615] [dashscope] 轮询 #2 状态=succeeded 已等 12s task=v1 {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:02+0800 INFO  [aihub:88615] 视频完成 用时12s 共1个 /Users/sharecreators/Desktop/work/aihub/data/media/videos/fake.mp4 {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:02+0800 INFO  [aihub.cos:88615] COS 已删除临时对象 key=aihub/tmp/454c5b7d55ad46a4b0b3c6958d60a3fc.png {job=76b86ad0491947dd model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:08+0800 INFO  [aihub.provider:88615] [dashscope] 轮询 #1 状态=succeeded 已等 6s task=v1 {job=jid-x model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:08+0800 INFO  [aihub:88615] 视频完成 用时6s 共1个 /Users/sharecreators/Desktop/work/aihub/data/media/videos/fake.mp4 {job=jid-x model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:08+0800 INFO  [aihub.cos:88615] COS 已删除临时对象 key=aihub/tmp/454c5b7d55ad46a4b0b3c6958d60a3fc.png {job=jid-x model=dashscope/wan2.2-i2v-plus}
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] AI Hub 启动 PID=88836 时区=CST +0800 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] 出图开始 模型=Qwen-Image 图生图(Qwen/Qwen-Image-Edit-2511) 尺寸=1328x1328 数量=1 参考图1张 prompt=加只猫 其它参数={} {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.cos:88836] COS 客户端已创建 region=ap-guangzhou bucket=b-1250000000 {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.cos:88836] COS 已上传 key=aihub/tmp/d64caea68d5d46ccb288b8325751aa86.png 大小=0.1KB 预签名有效期=1800s {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.provider:88836] → [modelscope] POST http://ms/v1/images/generations {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.provider:88836] ← [modelscope] 200 /v1/images/generations 0ms {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.provider:88836] [modelscope] 轮询 #1 状态=SUCCEED 已等 0s task=t1 {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub.cos:88836] COS 已删除临时对象 key=aihub/tmp/d64caea68d5d46ccb288b8325751aa86.png {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] 上游返回 1 张，开始落盘 {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] 出图成功 用时0.0s 共1张 /Users/sharecreators/Desktop/work/aihub/data/media/images/ce1af1a6d44440f9.png (0.0 KB) {job=78e5f5aae87a401c model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 19:24:53+0800 INFO  [aihub:88836] POST /api/image → 200 9ms
+2026-08-13 19:25:03+0800 INFO  [aihub:88906] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 19:25:03+0800 INFO  [aihub:88906] AI Hub 启动 PID=88906 时区=CST +0800 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 19:25:03+0800 INFO  [uvicorn.error:88906] Started server process [88906]
+2026-08-13 19:25:03+0800 INFO  [uvicorn.error:88906] Waiting for application startup.
+2026-08-13 19:25:03+0800 INFO  [uvicorn.error:88906] Application startup complete.
+2026-08-13 19:25:03+0800 INFO  [uvicorn.error:88906] Uvicorn running on http://127.0.0.1:8093 (Press CTRL+C to quit)
+2026-08-13 19:25:07+0800 INFO  [aihub:88906] GET /api/cos → 200 63ms
+2026-08-13 19:25:07+0800 WARNING [aihub:88906] POST /api/cos/test → 400 1ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/tools → 200 11ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/models → 200 18ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/storage → 200 18ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/conversations → 200 18ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/cos → 200 17ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/context → 200 18ms
+2026-08-13 19:25:15+0800 INFO  [aihub:88906] GET /api/config → 200 1ms
+2026-08-13 19:25:24+0800 WARNING [aihub:88906] POST /api/cos/test → 400 2ms
+2026-08-13 19:26:04+0800 INFO  [uvicorn.error:88906] Shutting down
+2026-08-13 19:26:04+0800 INFO  [uvicorn.error:88906] Waiting for application shutdown.
+2026-08-13 19:26:04+0800 WARNING [aihub:88906] 服务开始关闭 PID=88906。若你没有主动停止，通常是收到了外部信号（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。
+2026-08-13 19:26:04+0800 INFO  [uvicorn.error:88906] Application shutdown complete.
+2026-08-13 19:26:04+0800 INFO  [uvicorn.error:88906] Finished server process [88906]
+2026-08-13 19:26:04+0800 INFO  [aihub:89150] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 19:26:04+0800 INFO  [aihub:89150] AI Hub 启动 PID=89150 时区=CST +0800 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] AI Hub 启动 PID=89995 时区=PDT -0700 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 04:30:16-0700 INFO  [uvicorn.error:89995] Started server process [89995]
+2026-08-13 04:30:16-0700 INFO  [uvicorn.error:89995] Waiting for application startup.
+2026-08-13 04:30:16-0700 INFO  [uvicorn.error:89995] Application startup complete.
+2026-08-13 04:30:16-0700 INFO  [uvicorn.error:89995] Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/models → 200 13ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/models → 200 30ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/conversations → 200 29ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/storage → 200 28ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/tools → 200 25ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/context → 200 5ms
+2026-08-13 04:30:16-0700 INFO  [aihub:89995] GET /api/config → 200 11ms
+2026-08-13 04:30:17-0700 INFO  [aihub:89995] GET /api/cos → 200 93ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/tools → 200 20ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/models → 200 24ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/context → 200 22ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/storage → 200 23ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/cos → 200 22ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/conversations → 200 24ms
+2026-08-13 04:30:25-0700 INFO  [aihub:89995] GET /api/config → 200 1ms
+2026-08-13 04:30:32-0700 INFO  [aihub:89995] GET /api/jobs → 200 6ms
+2026-08-13 04:30:36-0700 INFO  [aihub:89995] 任务 11311c252a3e417f 记录已删除（状态=failed，无结果文件）
+2026-08-13 04:30:36-0700 INFO  [aihub:89995] DELETE /api/jobs/11311c252a3e417f → 200 16ms
+2026-08-13 04:30:36-0700 INFO  [aihub:89995] GET /api/jobs → 200 2ms
+2026-08-13 04:30:38-0700 INFO  [aihub:89995] 任务 4a9dd88403114a3c 记录已删除（状态=failed，无结果文件）
+2026-08-13 04:30:38-0700 INFO  [aihub:89995] DELETE /api/jobs/4a9dd88403114a3c → 200 6ms
+2026-08-13 04:30:38-0700 INFO  [aihub:89995] GET /api/jobs → 200 2ms
+2026-08-13 04:30:40-0700 INFO  [aihub:89995] 任务 78e5f5aae87a401c 已从页面隐藏（记录与 1 个结果文件保留）
+2026-08-13 04:30:40-0700 INFO  [aihub:89995] DELETE /api/jobs/78e5f5aae87a401c → 200 6ms
+2026-08-13 04:30:40-0700 INFO  [aihub:89995] GET /api/jobs → 200 2ms
+2026-08-13 04:31:42-0700 INFO  [aihub:89995] 出图开始 模型=Qwen-Image 图生图(Qwen/Qwen-Image-Edit-2511) 尺寸=1664x928 数量=1 参考图1张 prompt=把图中狐狸换成老虎 其它参数={} {job=3ee1e8d0f6584417 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:31:42-0700 ERROR [aihub:89995] 出图失败 用时0.0s: 该服务商只接受公网图片 URL，需要先配置腾讯云 COS 作为临时图床：在 config.yaml 的 cos 段填 secret_id / secret_key / region / bucket（当前缺少: secret_id, secret_key, bucket） {job=3ee1e8d0f6584417 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:31:42-0700 WARNING [aihub:89995] POST /api/image → 502 98ms
+2026-08-13 04:32:55-0700 INFO  [uvicorn.error:89995] Shutting down
+2026-08-13 04:32:55-0700 INFO  [uvicorn.error:89995] Waiting for application shutdown.
+2026-08-13 04:32:55-0700 WARNING [aihub:89995] 服务开始关闭 PID=89995。若你没有主动停止，通常是收到了外部信号（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。
+2026-08-13 04:32:55-0700 INFO  [uvicorn.error:89995] Application shutdown complete.
+2026-08-13 04:32:55-0700 INFO  [uvicorn.error:89995] Finished server process [89995]
+2026-08-13 04:45:45-0700 INFO  [aihub:97253] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 04:45:45-0700 INFO  [aihub:97253] AI Hub 启动 PID=97253 时区=PDT -0700 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log
+2026-08-13 04:45:46-0700 INFO  [uvicorn.error:97253] Started server process [97253]
+2026-08-13 04:45:46-0700 INFO  [uvicorn.error:97253] Waiting for application startup.
+2026-08-13 04:45:46-0700 INFO  [uvicorn.error:97253] Application startup complete.
+2026-08-13 04:45:46-0700 INFO  [uvicorn.error:97253] Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/models → 200 11ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/models → 200 17ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/conversations → 200 17ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/storage → 200 16ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/tools → 200 12ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/context → 200 12ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/config → 200 2ms
+2026-08-13 04:45:46-0700 INFO  [aihub:97253] GET /api/cos → 200 84ms
+2026-08-13 04:45:55-0700 INFO  [aihub:97253] 出图开始 模型=Qwen-Image 图生图(Qwen/Qwen-Image-Edit-2511) 尺寸=1664x928 数量=1 参考图1张 prompt=把图中狐狸换成老虎 其它参数={} {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:45:55-0700 INFO  [aihub.cos:97253] COS 客户端已创建 region=ap-guangzhou bucket=sc-test-1355117487 {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:45:55-0700 INFO  [qcloud_cos.cos_client:97253] put object, url=:https://sc-test-1355117487.cos.ap-guangzhou.myqcloud.com/tmp/37c10f5455d0402b9d638c0458a3f9fa.png ,headers=:{'Content-Type': 'image/png', 'x-cos-storage-class': 'STANDARD'} {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:05-0700 INFO  [aihub.cos:97253] COS 已上传 key=tmp/37c10f5455d0402b9d638c0458a3f9fa.png 大小=1905.4KB 预签名有效期=1800s {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:05-0700 INFO  [aihub.provider:97253] → [modelscope] POST https://api-inference.modelscope.cn/v1/images/generations {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:12-0700 INFO  [aihub.provider:97253] ← [modelscope] 200 /v1/images/generations 6808ms {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:15-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #1 状态=RUNNING 已等 3s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:20-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #2 状态=RUNNING 已等 7s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:24-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #3 状态=RUNNING 已等 12s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:27-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #4 状态=RUNNING 已等 15s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:32-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #5 状态=RUNNING 已等 20s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:36-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #6 状态=RUNNING 已等 24s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:40-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #7 状态=RUNNING 已等 28s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:44-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #8 状态=RUNNING 已等 32s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:48-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #9 状态=RUNNING 已等 36s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:52-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #10 状态=RUNNING 已等 39s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #11 状态=RUNNING 已等 43s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:46:59-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #12 状态=RUNNING 已等 47s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:02-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #13 状态=RUNNING 已等 50s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:06-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #14 状态=RUNNING 已等 54s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:10-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #15 状态=RUNNING 已等 58s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:14-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #16 状态=RUNNING 已等 62s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:18-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #17 状态=RUNNING 已等 66s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:22-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #18 状态=RUNNING 已等 70s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:26-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #19 状态=RUNNING 已等 74s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:30-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #20 状态=RUNNING 已等 78s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:33-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #21 状态=RUNNING 已等 81s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:37-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #22 状态=RUNNING 已等 85s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:41-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #23 状态=RUNNING 已等 89s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:44-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #24 状态=RUNNING 已等 92s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:48-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #25 状态=RUNNING 已等 96s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:52-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #26 状态=RUNNING 已等 99s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #27 状态=RUNNING 已等 103s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:47:59-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #28 状态=RUNNING 已等 107s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:03-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #29 状态=RUNNING 已等 111s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:07-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #30 状态=RUNNING 已等 114s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:11-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #31 状态=RUNNING 已等 118s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:15-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #32 状态=RUNNING 已等 123s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:18-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #33 状态=RUNNING 已等 126s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:22-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #34 状态=RUNNING 已等 130s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:26-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #35 状态=RUNNING 已等 133s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:29-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #36 状态=RUNNING 已等 137s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:33-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #37 状态=RUNNING 已等 141s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:37-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #38 状态=RUNNING 已等 145s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:41-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #39 状态=RUNNING 已等 148s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:44-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #40 状态=RUNNING 已等 152s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:48-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #41 状态=RUNNING 已等 156s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:51-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #42 状态=RUNNING 已等 159s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #43 状态=RUNNING 已等 163s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:48:59-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #44 状态=RUNNING 已等 167s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:03-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #45 状态=RUNNING 已等 170s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:06-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #46 状态=RUNNING 已等 174s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:10-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #47 状态=RUNNING 已等 178s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:14-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #48 状态=RUNNING 已等 181s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:17-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #49 状态=RUNNING 已等 185s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:21-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #50 状态=RUNNING 已等 189s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:25-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #51 状态=RUNNING 已等 193s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:29-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #52 状态=RUNNING 已等 196s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:32-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #53 状态=RUNNING 已等 200s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:36-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #54 状态=RUNNING 已等 204s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:39-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #55 状态=RUNNING 已等 207s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:44-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #56 状态=RUNNING 已等 212s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:48-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #57 状态=RUNNING 已等 215s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:51-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #58 状态=RUNNING 已等 219s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #59 状态=RUNNING 已等 223s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:49:59-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #60 状态=RUNNING 已等 226s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:02-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #61 状态=RUNNING 已等 230s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:06-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #62 状态=RUNNING 已等 234s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:09-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #63 状态=RUNNING 已等 237s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:13-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #64 状态=RUNNING 已等 241s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:18-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #65 状态=RUNNING 已等 245s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:21-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #66 状态=RUNNING 已等 249s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:25-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #67 状态=RUNNING 已等 253s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:29-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #68 状态=RUNNING 已等 256s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:32-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #69 状态=RUNNING 已等 260s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:36-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #70 状态=RUNNING 已等 264s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:40-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #71 状态=RUNNING 已等 268s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:44-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #72 状态=RUNNING 已等 272s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:48-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #73 状态=RUNNING 已等 275s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:51-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #74 状态=RUNNING 已等 279s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #75 状态=RUNNING 已等 283s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:50:58-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #76 状态=RUNNING 已等 286s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:04-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #77 状态=RUNNING 已等 292s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:07-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #78 状态=RUNNING 已等 295s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:11-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #79 状态=RUNNING 已等 299s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:16-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #80 状态=RUNNING 已等 303s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:19-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #81 状态=RUNNING 已等 307s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:23-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #82 状态=RUNNING 已等 311s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:26-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #83 状态=RUNNING 已等 314s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:30-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #84 状态=RUNNING 已等 318s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:34-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #85 状态=RUNNING 已等 322s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:38-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #86 状态=RUNNING 已等 326s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:42-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #87 状态=RUNNING 已等 330s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:46-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #88 状态=RUNNING 已等 334s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:50-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #89 状态=RUNNING 已等 338s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:55-0700 INFO  [aihub.provider:97253] [modelscope] 轮询 #90 状态=SUCCEED 已等 342s task=9f335ded-29ea-4979-8306-10ec3ab9672f {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:55-0700 INFO  [qcloud_cos.cos_client:97253] delete object, url=:https://sc-test-1355117487.cos.ap-guangzhou.myqcloud.com/tmp/37c10f5455d0402b9d638c0458a3f9fa.png ,headers=:{} {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:59-0700 INFO  [aihub.cos:97253] COS 已删除临时对象 key=tmp/37c10f5455d0402b9d638c0458a3f9fa.png {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:51:59-0700 INFO  [aihub:97253] 上游返回 1 张，开始落盘 {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:52:11-0700 INFO  [aihub:97253] 出图成功 用时375.6s 共1张 /Users/sharecreators/Desktop/work/aihub/data/media/images/9635337e64f64e10.png (2105.1 KB) {job=1868244104a14a60 model=modelscope/Qwen/Qwen-Image-Edit-2511}
+2026-08-13 04:52:11-0700 INFO  [aihub:97253] POST /api/image → 200 375749ms
+2026-08-13 04:52:11-0700 INFO  [aihub:97253] GET /api/jobs → 200 41ms
+2026-08-13 04:53:35-0700 INFO  [aihub:97253] 任务 3ee1e8d0f6584417 记录已删除（状态=failed，无结果文件）
+2026-08-13 04:53:35-0700 INFO  [aihub:97253] DELETE /api/jobs/3ee1e8d0f6584417 → 200 32ms
+2026-08-13 04:53:35-0700 INFO  [aihub:97253] GET /api/jobs → 200 22ms
+2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Shutting down
+2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Waiting for application shutdown.
+2026-08-13 04:53:54-0700 WARNING [aihub:97253] 服务开始关闭 PID=97253。若你没有主动停止，通常是收到了外部信号（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。
+2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Application shutdown complete.
+2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Finished server process [97253]

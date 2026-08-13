@@ -20,6 +20,9 @@ class ProviderError(RuntimeError):
 
 class BaseProvider:
     kind = "base"
+    # True = 该服务商的图片入参只认公网 URL，不吃 base64。
+    # 本地上传的图会先经腾讯云 COS 转成临时预签名 URL（见 app/cos.py）。
+    public_url_refs = False
 
     def __init__(self, conf: dict[str, Any]):
         self.conf = conf
@@ -82,7 +85,14 @@ class BaseProvider:
         log.log(lvl, "← [%s] %s %s %s%s", self.id, response.status_code,
                 response.request.url.path, ms, detail)
 
-    POLL = {"aihub_poll": True}   # 传给 httpx 的 extensions，标记这是轮询请求
+    @property
+    def POLL(self) -> dict:
+        """标记轮询请求的 httpx extensions。
+
+        每次都返回新 dict——httpx 会把 extensions 挂到 request 上，我们的钩子还会往
+        里写 aihub_t0，共用一个 dict 会互相污染。
+        """
+        return {"aihub_poll": True}
 
     def poll_progress(self, attempt: int, status: str, waited: float,
                       task_id: str = "") -> None:
@@ -97,12 +107,12 @@ class BaseProvider:
             )
 
     def no_image_input(self) -> None:
-        """不支持「图生图」的服务商统一在这里报错，提示可用的替代。"""
+        """出图接口本身不支持参考图的服务商，统一在这里报错并给出替代。"""
         raise ProviderError(
-            f"{self.name} 的出图接口不支持上传参考图（图生图）。"
-            "本地上传的图片是 base64，目前支持图生图的是：OpenAI 兼容接口、"
-            "火山方舟即梦、Google Gemini Flash Image、魔搭。"
-            "阿里百炼/智谱的图生图需要公网可访问的图片 URL。"
+            f"{self.name} 当前配置的出图模型是纯文生图，不接受参考图"
+            "（它们的图生图要换成专门的图片编辑模型和接口，本项目暂未接入）。"
+            "需要图生图请改用：魔搭 Qwen-Image-Edit、火山方舟即梦 Seedream、"
+            "Google Gemini Flash Image，或 OpenAI 兼容接口的图片编辑模型。"
         )
 
     @staticmethod
