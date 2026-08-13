@@ -1,0 +1,212 @@
+# ==========================================================
+# AI Hub 模型配置
+# ----------------------------------------------------------
+# 每个 provider 一个条目。api_key 支持 ${ENV_VAR} 形式从环境
+# 变量 / .env 读取，也可以直接写明文（不建议提交到 git）。
+#
+# kind 可选值:
+#   openai   - 任何 OpenAI 兼容接口 (OpenAI/DeepSeek/Kimi/硅基流动/Ollama/vLLM...)
+#   gemini   - Google Gemini (含 Imagen 出图、Veo 出视频)
+#   dashscope- 阿里百炼/通义 (千问 + 万相图片/视频)
+#   ark      - 火山方舟 豆包 / 即梦 (Doubao + Seedream/Seedance)
+#   zhipu    - 智谱 GLM (CogView 图片 / CogVideoX 视频)
+#   modelscope - 魔搭社区 ModelScope API-Inference (对话 + 异步出图)
+#
+# models 下按能力分组: chat / image / video
+# 留空的分组表示该 provider 不提供该能力。
+# ==========================================================
+
+providers:
+  - id: openai
+    name: OpenAI
+    kind: openai
+    base_url: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}
+    models:
+      chat:
+        - id: gpt-4o
+          name: GPT-4o
+          vision: true
+        - id: gpt-4o-mini
+          name: GPT-4o mini
+          vision: true
+      image:
+        - id: gpt-image-1
+          name: GPT Image 1
+        - id: dall-e-3
+          name: DALL·E 3
+      video: []
+
+  - id: deepseek
+    name: DeepSeek
+    kind: openai
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    models:
+      chat:
+        - id: deepseek-chat
+          name: DeepSeek V3
+        - id: deepseek-reasoner
+          name: DeepSeek R1 (推理)
+          reasoning: true
+      image: []
+      video: []
+
+  - id: siliconflow
+    name: 硅基流动
+    kind: openai
+    base_url: https://api.siliconflow.cn/v1
+    api_key: ${SILICONFLOW_API_KEY}
+    models:
+      chat:
+        - id: Qwen/Qwen3-8B
+          name: Qwen3-8B
+        - id: deepseek-ai/DeepSeek-V3
+          name: DeepSeek-V3
+      image:
+        - id: Kwai-Kolors/Kolors
+          name: Kolors 出图
+      video: []
+
+  - id: ollama
+    name: Ollama (本地)
+    kind: openai
+    base_url: http://localhost:11434/v1
+    api_key: ollama
+    models:
+      chat:
+        - id: qwen3:8b
+          name: Qwen3 8B
+        - id: llama3.2-vision
+          name: Llama3.2 Vision
+          vision: true
+      image: []
+      video: []
+
+  - id: modelscope
+    name: 魔搭社区 ModelScope
+    kind: modelscope
+    base_url: https://api-inference.modelscope.cn/v1
+    api_key: ${MODELSCOPE_API_KEY}
+    async_image: true          # 出图走异步任务模式，false 则同步（易超时）
+    models:
+      chat:
+        - id: Qwen/Qwen3-235B-A22B-Instruct-2507
+          name: Qwen3-235B-A22B
+        - id: deepseek-ai/DeepSeek-V3.1
+          name: DeepSeek-V3.1
+        - id: ZhipuAI/GLM-4.5
+          name: GLM-4.5
+        - id: Qwen/Qwen2.5-VL-72B-Instruct
+          name: Qwen2.5-VL-72B (视觉)
+          vision: true
+      image:
+        - id: Qwen/Qwen-Image
+          name: Qwen-Image 文生图
+        - id: MusePublic/489_ckpt_FLUX_1
+          name: FLUX.1 dev
+        - id: MAILAND/majicflus_v1
+          name: majicFlus 写实
+      video: []
+
+  - id: gemini
+    name: Google Gemini
+    kind: gemini
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    api_key: ${GEMINI_API_KEY}
+    models:
+      chat:
+        - id: gemini-2.5-flash
+          name: Gemini 2.5 Flash
+          vision: true
+        - id: gemini-2.5-pro
+          name: Gemini 2.5 Pro
+          vision: true
+      image:
+        - id: imagen-4.0-generate-001
+          name: Imagen 4
+        - id: gemini-2.5-flash-image
+          name: Gemini Flash Image (Nano Banana)
+      video:
+        - id: veo-3.0-generate-001
+          name: Veo 3
+
+  - id: dashscope
+    name: 阿里百炼 (通义/万相)
+    kind: dashscope
+    base_url: https://dashscope.aliyuncs.com/api/v1
+    compat_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key: ${DASHSCOPE_API_KEY}
+    models:
+      chat:
+        - id: qwen-plus
+          name: 通义千问 Plus
+        - id: qwen-vl-max
+          name: 通义千问 VL Max
+          vision: true
+      image:
+        - id: wan2.2-t2i-flash
+          name: 万相 2.2 文生图 Flash
+        - id: wanx2.1-t2i-turbo
+          name: 万相 2.1 文生图 Turbo
+      video:
+        - id: wan2.2-t2v-plus
+          name: 万相 2.2 文生视频
+        - id: wan2.2-i2v-plus
+          name: 万相 2.2 图生视频
+          image_input: true
+
+  - id: ark
+    name: 火山方舟 (豆包/即梦)
+    kind: ark
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    api_key: ${ARK_API_KEY}
+    models:
+      chat:
+        - id: doubao-seed-1-6-250615
+          name: 豆包 Seed 1.6
+          vision: true
+      image:
+        - id: doubao-seedream-4-0-250828
+          name: 即梦 Seedream 4.0
+      video:
+        - id: doubao-seedance-1-0-pro-250528
+          name: 即梦 Seedance 1.0 Pro
+          image_input: true
+
+  - id: zhipu
+    name: 智谱 GLM
+    kind: zhipu
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    api_key: ${ZHIPU_API_KEY}
+    models:
+      chat:
+        - id: glm-4.6
+          name: GLM-4.6
+        - id: glm-4v-plus
+          name: GLM-4V Plus
+          vision: true
+      image:
+        - id: cogview-4
+          name: CogView-4
+      video:
+        - id: cogvideox-3
+          name: CogVideoX-3
+          image_input: true
+
+# ==========================================================
+# 生成结果保存目录
+# 支持相对路径（相对本工程根目录）与绝对路径，如:
+#   image_dir: /Users/me/Pictures/AI
+#   video_dir: ~/Movies/AI
+# 也可以在 Web 界面「⚙️ 模型配置 → 保存目录」里直接浏览选择。
+# ==========================================================
+storage:
+  image_dir: data/media/images
+  video_dir: data/media/videos
+
+# 默认选中的模型
+defaults:
+  chat: "deepseek/deepseek-chat"
+  image: "dashscope/wan2.2-t2i-flash"
+  video: "dashscope/wan2.2-t2v-plus"

@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Hub · 多模型工作台</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a22; --panel2:#1c2129; --line:#272d38;
+    --fg:#e6e9ef; --dim:#98a2b3; --accent:#6366f1; --accent2:#22d3ee;
+    --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+       background:var(--bg);color:var(--fg);height:100vh;overflow:hidden}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);
+         color:var(--fg);border-radius:8px;padding:7px 12px;transition:.15s}
+  button:hover{border-color:var(--accent);background:#232936}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  input,select,textarea{font:inherit;background:var(--panel2);color:var(--fg);
+      border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+  textarea{resize:vertical;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .app{display:flex;height:100vh}
+
+  /* 左侧 */
+  .side{width:250px;flex:0 0 250px;background:var(--panel);border-right:1px solid var(--line);
+        display:flex;flex-direction:column}
+  .brand{padding:16px;font-weight:700;font-size:16px;letter-spacing:.5px;
+         border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;
+       background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  .tabs{display:flex;flex-direction:column;padding:8px;gap:2px}
+  .tab{padding:9px 12px;border-radius:8px;color:var(--dim);cursor:pointer;user-select:none}
+  .tab:hover{background:var(--panel2);color:var(--fg)}
+  .tab.on{background:var(--panel2);color:var(--fg);box-shadow:inset 2px 0 0 var(--accent)}
+  .convs{flex:1;overflow:auto;padding:8px;border-top:1px solid var(--line)}
+  .convs h4{margin:6px 6px 8px;font-size:12px;color:var(--dim);font-weight:600}
+  .conv{padding:8px 10px;border-radius:8px;color:var(--dim);cursor:pointer;font-size:13px;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+  .conv:hover{background:var(--panel2);color:var(--fg)}
+  .conv.on{background:#232936;color:var(--fg)}
+  .conv .x{margin-left:auto;opacity:0;font-size:12px;color:var(--dim)}
+  .conv:hover .x{opacity:.7}
+
+  /* 主区 */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;
+          align-items:center;background:var(--panel);flex-wrap:wrap}
+  .topbar select{width:auto;min-width:230px}
+  .spacer{flex:1}
+  .page{flex:1;overflow:auto;padding:20px;display:none}
+  .page.on{display:block}
+  .row{display:flex;gap:20px;align-items:flex-start}
+  .col{flex:1;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h3{margin:0 0 12px;font-size:14px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+  .hint{font-size:12px;color:var(--dim)}
+  .badge{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .badge.ok{color:var(--ok);border-color:#1c4532}
+  .badge.no{color:var(--warn);border-color:#4a3a12}
+
+  /* 聊天 */
+  #chatPage{display:none;flex-direction:column;padding:0;overflow:hidden}
+  #chatPage.on{display:flex}
+  .msgs{flex:1;overflow:auto;padding:24px;display:flex;flex-direction:column;gap:18px}
+  .msg{max-width:860px;width:100%;margin:0 auto;display:flex;gap:12px}
+  .ava{width:30px;height:30px;flex:0 0 30px;border-radius:8px;display:grid;place-items:center;
+       font-size:12px;font-weight:700;background:var(--panel2);border:1px solid var(--line)}
+  .msg.user .ava{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0}
+  .bubble{flex:1;min-width:0}
+  .bubble .who{font-size:12px;color:var(--dim);margin-bottom:4px}
+  .body{white-space:pre-wrap;word-break:break-word}
+  .body code{background:#0b0d12;padding:1px 5px;border-radius:4px;font-size:13px}
+  .body pre{background:#0b0d12;border:1px solid var(--line);padding:12px;border-radius:8px;
+            overflow:auto;white-space:pre}
+  .think{border-left:2px solid var(--line);padding:6px 0 6px 12px;margin-bottom:8px;
+         color:var(--dim);font-size:13px;white-space:pre-wrap}
+  .imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .imgs img{max-height:150px;border-radius:8px;border:1px solid var(--line)}
+  .composer{border-top:1px solid var(--line);padding:14px 24px;background:var(--panel)}
+  .composer .inner{max-width:860px;margin:0 auto}
+  .cbox{display:flex;gap:10px;align-items:flex-end}
+  .cbox textarea{min-height:52px;max-height:220px}
+  .attach{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .attach .t{position:relative}
+  .attach img{height:56px;border-radius:6px;border:1px solid var(--line)}
+  .attach .rm{position:absolute;top:-6px;right:-6px;background:var(--err);color:#fff;border:0;
+              border-radius:50%;width:18px;height:18px;line-height:1;padding:0;font-size:12px}
+
+  /* 结果网格 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:16px}
+  .item{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .item img,.item video{width:100%;display:block;background:#000}
+  .item .meta{padding:9px 11px;font-size:12px;color:var(--dim)}
+  .item .st{font-size:11px}
+  .st.running{color:var(--warn)} .st.succeeded{color:var(--ok)} .st.failed{color:var(--err)}
+  .toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--err);
+         color:var(--fg);padding:11px 15px;border-radius:10px;max-width:420px;display:none;z-index:99;
+         white-space:pre-wrap;font-size:13px}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);
+        border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:#2b323d;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="dot"></span> AI Hub</div>
+    <div class="tabs">
+      <div class="tab on" data-page="chat">💬 对话</div>
+      <div class="tab" data-page="image">🎨 图片生成</div>
+      <div class="tab" data-page="video">🎬 视频生成</div>
+      <div class="tab" data-page="settings">⚙️ 模型配置</div>
+    </div>
+    <div class="convs">
+      <h4>会话历史 <button style="float:right;padding:1px 8px;font-size:12px" onclick="newConv()">+ 新建</button></h4>
+      <div id="convList"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ============ 对话 ============ -->
+    <div class="topbar" id="chatBar">
+      <select id="chatModel"></select>
+      <button onclick="togglePanel()">参数</button>
+      <div class="spacer"></div>
+      <span class="hint" id="chatHint"></span>
+    </div>
+
+    <div class="card" id="chatParams" style="display:none;margin:12px 24px 0">
+      <div class="row">
+        <div class="col">
+          <div class="field"><label>系统提示词 System Prompt</label>
+            <textarea id="sysPrompt" rows="3" placeholder="你是一个乐于助人的助手…"></textarea></div>
+        </div>
+        <div class="col" style="max-width:300px">
+          <div class="field"><label>Temperature <b id="tLbl">0.7</b></label>
+            <input type="range" id="temp" min="0" max="2" step="0.1" value="0.7"
+                   oninput="tLbl.textContent=this.value"></div>
+          <div class="field"><label>Top P <b id="pLbl">1</b></label>
+            <input type="range" id="topp" min="0" max="1" step="0.05" value="1"
+                   oninput="pLbl.textContent=this.value"></div>
+          <div class="field"><label>Max Tokens</label>
+            <input type="number" id="maxTok" placeholder="留空使用默认"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page on" id="chatPage">
+      <div class="msgs" id="msgs"></div>
+      <div class="composer">
+        <div class="inner">
+          <div class="attach" id="attach"></div>
+          <div class="cbox">
+            <button onclick="pickImg()" title="上传图片">🖼</button>
+            <textarea id="input" rows="1" placeholder="输入消息，Enter 发送 / Shift+Enter 换行"></textarea>
+            <button class="primary" id="sendBtn" onclick="send()">发送</button>
+            <button id="stopBtn" style="display:none" onclick="stopGen()">停止</button>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" multiple hidden />
+    </div>
+
+    <!-- ============ 图片 ============ -->
+    <div class="page" id="imagePage">
+      <div class="card">
+        <h3>图片生成</h3>
+        <div class="row">
+          <div class="col">
+            <div class="field"><label>模型</label><select id="imgModel"></select></div>
+            <div class="field"><label>提示词</label>
+              <textarea id="imgPrompt" rows="4" placeholder="一只穿着宇航服的柴犬，站在月球表面，电影感光影"></textarea></div>
+            <div class="field"><label>负向提示词（可选）</label>
+              <input id="imgNeg" placeholder="低质量, 模糊, 变形"></div>
+          </div>
+          <div class="col" style="max-width:280px">
+            <div class="field"><label>尺寸</label>
+              <select id="imgSize">
+                <option>1024x1024</option><option>1280x720</option><option>720x1280</option>
+                <option>1024x768</option><option>768x1024</option><option>2K</option>
+              </select></div>
+            <div class="field"><label>数量</label>
+              <input type="number" id="imgN" value="1" min="1" max="4"></div>
+            <div class="field"><label>随机种子（可选）</label>
+              <input type="number" id="imgSeed" placeholder="留空随机"></div>
+            <button class="primary" id="imgBtn" style="width:100%" onclick="genImage()">生成图片</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid" id="imgGrid"></div>
+    </div>
+
+    <!-- ============ 视频 ============ -->
+    <div class="page" id="videoPage">
+      <div class="card">
+        <h3>视频生成</h3>
+        <div class="row">
+          <div class="col">
+            <div class="field"><label>模型</label><select id="vidModel"></select></div>
+            <div class="field"><label>提示词</label>
+              <textarea id="vidPrompt" rows="4" placeholder="镜头缓慢推进，赛博朋克城市雨夜，霓虹倒映在积水路面"></textarea></div>
+            <div class="field"><label>首帧图片（图生视频，可选）</label>
+              <input type="file" id="vidImg" accept="image/*">
+              <div id="vidImgPrev" style="margin-top:8px"></div></div>
+          </div>
+          <div class="col" style="max-width:280px">
+            <div class="field"><label>时长（秒）</label>
+              <select id="vidDur"><option>5</option><option>10</option></select></div>
+            <div class="field"><label>比例</label>
+              <select id="vidRatio"><option>16:9</option><option>9:16</option><option>1:1</option></select></div>
+            <div class="field"><label>分辨率</label>
+              <select id="vidRes"><option>720p</option><option>1080p</option></select></div>
+            <button class="primary" id="vidBtn" style="width:100%" onclick="genVideo()">生成视频</button>
+            <div class="hint" style="margin-top:8px">视频为异步任务，通常需 1–5 分钟，页面会自动刷新状态。</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid" id="vidGrid"></div>
+    </div>
+
+    <!-- ============ 设置 ============ -->
+    <div class="page" id="settingsPage">
+      <div class="card" style="margin-bottom:16px">
+        <h3>已配置的服务商</h3>
+        <div id="provList"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3>📁 保存目录</h3>
+        <div class="row">
+          <div class="col">
+            <div class="field"><label>图片保存目录</label>
+              <div style="display:flex;gap:8px">
+                <input id="imgDir" placeholder="data/media/images">
+                <button style="white-space:nowrap" onclick="browse('imgDir')">浏览…</button>
+              </div>
+              <div class="hint" id="imgDirAbs" style="margin-top:4px"></div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="field"><label>视频保存目录</label>
+              <div style="display:flex;gap:8px">
+                <input id="vidDir" placeholder="data/media/videos">
+                <button style="white-space:nowrap" onclick="browse('vidDir')">浏览…</button>
+              </div>
+              <div class="hint" id="vidDirAbs" style="margin-top:4px"></div>
+            </div>
+          </div>
+        </div>
+        <button class="primary" onclick="saveDirs()">保存目录设置</button>
+        <span class="hint" style="margin-left:10px">支持绝对路径、<code>~/</code> 开头或相对工程根目录的相对路径</span>
+      </div>
+
+      <div class="card">
+        <h3>config.yaml <button class="primary" style="float:right" onclick="saveCfg()">保存并重载</button></h3>
+        <textarea id="cfgText" rows="26" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
+        <div class="hint" style="margin-top:8px">
+          api_key 支持 <code>${ENV_NAME}</code> 形式从 .env 读取。修改后点击保存即时生效。
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- 目录选择器 -->
+<div id="fsMask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
+     align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;
+              width:600px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--line);font-weight:600">选择目录</div>
+    <div style="padding:12px 16px;border-bottom:1px solid var(--line)">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="fsPath" onkeydown="if(event.key==='Enter')fsGo(this.value)">
+        <button onclick="fsGo($('#fsPath').value)">跳转</button>
+        <button onclick="fsUp()">↑ 上级</button>
+      </div>
+      <div id="fsShort" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div id="fsList" style="flex:1;overflow:auto;padding:8px 10px;min-height:220px"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center">
+      <input id="fsNew" placeholder="新建子文件夹名" style="flex:1">
+      <button onclick="fsMkdir()">新建</button>
+      <span style="flex:1"></span>
+      <button onclick="$('#fsMask').style.display='none'">取消</button>
+      <button class="primary" onclick="fsPick()">选择此目录</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let CFG = {providers:[], defaults:{}}, convId = null, pending = [], ctrl = null;
+
+function toast(msg, ms=6000){ const t=$('#toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms); }
+const esc = s => (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function md(s){ // 极简 markdown：代码块 / 行内代码 / 粗体
+  return esc(s)
+    .replace(/```([\s\S]*?)```/g,(m,c)=>`<pre>${c.replace(/^\w*\n/,'')}</pre>`)
+    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
+}
+
+/* ---------- 页签 ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  const p = t.dataset.page;
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
+  $('#'+p+'Page').classList.add('on');
+  $('#chatBar').style.display = p==='chat' ? 'flex' : 'none';
+  $('#chatParams').style.display = 'none';
+  if(p==='image') loadJobs('image');
+  if(p==='video') loadJobs('video');
+});
+const togglePanel = () => { const e=$('#chatParams'); e.style.display = e.style.display==='none'?'block':'none'; };
+
+/* ---------- 加载模型 ---------- */
+async function loadModels(){
+  CFG = await (await fetch('/api/models')).json();
+  const fill = (sel, cap) => {
+    sel.innerHTML='';
+    CFG.providers.forEach(p=>{
+      const list = p[cap]||[]; if(!list.length) return;
+      const g = document.createElement('optgroup');
+      g.label = p.name + (p.has_key ? '' : '  ⚠未配置Key');
+      list.forEach(m=>{
+        const o = document.createElement('option');
+        o.value = p.id+'/'+m.id; o.textContent = m.name || m.id;
+        o.dataset.vision = m.vision?'1':''; g.appendChild(o);
+      });
+      sel.appendChild(g);
+    });
+  };
+  fill($('#chatModel'),'chat'); fill($('#imgModel'),'image'); fill($('#vidModel'),'video');
+  const d = CFG.defaults||{};
+  if(d.chat) $('#chatModel').value = d.chat;
+  if(d.image) $('#imgModel').value = d.image;
+  if(d.video) $('#vidModel').value = d.video;
+  updHint();
+  $('#provList').innerHTML = CFG.providers.map(p=>`
+    <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
+      <b style="width:150px">${esc(p.name)}</b>
+      <span class="badge ${p.has_key?'ok':'no'}">${p.has_key?'Key 已配置':'缺少 Key'}</span>
+      <span class="hint">${esc(p.base_url)}</span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="hint">对话 ${p.chat.length} · 图片 ${p.image.length} · 视频 ${p.video.length}</span>
+    </div>`).join('');
+  $('#cfgText').value = (await (await fetch('/api/config')).json()).content;
+}
+$('#chatModel').onchange = updHint;
+function updHint(){
+  const o = $('#chatModel').selectedOptions[0];
+  $('#chatHint').textContent = o ? (o.dataset.vision ? '该模型支持图片输入' : '纯文本模型') : '';
+}
+
+/* ---------- 会话 ---------- */
+async function loadConvs(){
+  const {items} = await (await fetch('/api/conversations')).json();
+  $('#convList').innerHTML = items.map(c=>`
+    <div class="conv ${c.id===convId?'on':''}" onclick="openConv('${c.id}')">
+      <span style="overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</span>
+      <span class="x" onclick="event.stopPropagation();delConv('${c.id}')">✕</span>
+    </div>`).join('') || '<div class="hint" style="padding:6px">暂无会话</div>';
+}
+function newConv(){ convId=null; $('#msgs').innerHTML=''; loadConvs(); }
+async function delConv(id){ await fetch('/api/conversations/'+id,{method:'DELETE'});
+  if(id===convId) newConv(); else loadConvs(); }
+async function openConv(id){
+  const c = await (await fetch('/api/conversations/'+id)).json();
+  convId = id; $('#msgs').innerHTML='';
+  c.messages.forEach(m=>addMsg(m.role, m.content, m.images, m.reasoning));
+  if(c.system_prompt) $('#sysPrompt').value = c.system_prompt;
+  if(c.model) $('#chatModel').value = c.model;
+  loadConvs();
+}
+
+/* ---------- 消息渲染 ---------- */
+function addMsg(role, text, images, reasoning){
+  const wrap = document.createElement('div');
+  wrap.className = 'msg '+role;
+  wrap.innerHTML = `<div class="ava">${role==='user'?'我':'AI'}</div>
+    <div class="bubble"><div class="who">${role==='user'?'你':'助手'}</div>
+      ${reasoning?`<div class="think">${esc(reasoning)}</div>`:'<div class="think" style="display:none"></div>'}
+      <div class="body">${md(text)}</div>
+      <div class="imgs">${(images||[]).map(u=>`<img src="${u}">`).join('')}</div></div>`;
+  $('#msgs').appendChild(wrap);
+  $('#msgs').scrollTop = $('#msgs').scrollHeight;
+  return wrap;
+}
+
+/* ---------- 图片附件 ---------- */
+const pickImg = () => $('#fileInput').click();
+$('#fileInput').onchange = e => {
+  [...e.target.files].forEach(f=>{
+    const r = new FileReader();
+    r.onload = () => { pending.push(r.result); renderAttach(); };
+    r.readAsDataURL(f);
+  });
+  e.target.value='';
+};
+function renderAttach(){
+  $('#attach').innerHTML = pending.map((u,i)=>
+    `<div class="t"><img src="${u}"><button class="rm" onclick="pending.splice(${i},1);renderAttach()">✕</button></div>`).join('');
+}
+
+/* ---------- 发送 ---------- */
+$('#input').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+function stopGen(){ if(ctrl) ctrl.abort(); }
+
+async function send(){
+  const text = $('#input').value.trim();
+  if(!text && !pending.length) return;
+  const model = $('#chatModel').value;
+  if(!model) return toast('请先选择对话模型');
+
+  addMsg('user', text, pending);
+  const imgs = pending.slice(); pending = []; renderAttach();
+  $('#input').value=''; $('#input').style.height='auto';
+
+  const node = addMsg('assistant','');
+  const bodyEl = node.querySelector('.body');
+  const thinkEl = node.querySelector('.think');
+  bodyEl.innerHTML = '<span class="spin"></span>';
+  $('#sendBtn').disabled = true; $('#stopBtn').style.display='inline-block';
+
+  const params = {};
+  const t = parseFloat($('#temp').value); if(!isNaN(t)) params.temperature = t;
+  const p = parseFloat($('#topp').value); if(!isNaN(p) && p<1) params.top_p = p;
+  const mt = parseInt($('#maxTok').value); if(mt) params.max_tokens = mt;
+
+  ctrl = new AbortController();
+  let acc='', think='';
+  try{
+    const resp = await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'}, signal: ctrl.signal,
+      body: JSON.stringify({conversation_id:convId, model, message:text, images:imgs,
+                            system_prompt:$('#sysPrompt').value, params})
+    });
+    if(!resp.ok) throw new Error(await resp.text());
+    const reader = resp.body.getReader(), dec = new TextDecoder();
+    let buf='';
+    while(true){
+      const {done, value} = await reader.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      const parts = buf.split('\n\n'); buf = parts.pop();
+      for(const part of parts){
+        const line = part.trim(); if(!line.startsWith('data:')) continue;
+        const ev = JSON.parse(line.slice(5));
+        if(ev.type==='start'){ convId = ev.conversation_id; }
+        else if(ev.type==='reasoning'){ think += ev.text; thinkEl.style.display='block';
+          thinkEl.textContent = '💭 ' + think; }
+        else if(ev.type==='delta'){ acc += ev.text; bodyEl.innerHTML = md(acc); }
+        else if(ev.type==='error'){ toast('生成失败：'+ev.message);
+          bodyEl.innerHTML = `<span style="color:var(--err)">⚠ ${esc(ev.message)}</span>`; }
+        else if(ev.type==='end'){ convId = ev.conversation_id || convId; }
+        $('#msgs').scrollTop = $('#msgs').scrollHeight;
+      }
+    }
+  }catch(e){
+    if(e.name!=='AbortError'){ toast('请求出错：'+e.message);
+      bodyEl.innerHTML = `<span style="color:var(--err)">⚠ ${esc(e.message)}</span>`; }
+  }finally{
+    ctrl=null; $('#sendBtn').disabled=false; $('#stopBtn').style.display='none';
+    if(!acc && !bodyEl.textContent.trim()) bodyEl.textContent='(无内容)';
+    loadConvs();
+  }
+}
+$('#input').addEventListener('input', function(){ this.style.height='auto';
+  this.style.height = Math.min(this.scrollHeight, 220)+'px'; });
+
+/* ---------- 图片生成 ---------- */
+async function genImage(){
+  const model = $('#imgModel').value, prompt = $('#imgPrompt').value.trim();
+  if(!model) return toast('请选择出图模型'); if(!prompt) return toast('请输入提示词');
+  const params = {size:$('#imgSize').value, n:parseInt($('#imgN').value)||1};
+  if($('#imgNeg').value.trim()) params.negative_prompt = $('#imgNeg').value.trim();
+  if($('#imgSeed').value) params.seed = parseInt($('#imgSeed').value);
+  const btn = $('#imgBtn'); btn.disabled=true; btn.textContent='生成中…';
+  try{
+    const r = await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model, prompt, params})});
+    if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    await loadJobs('image');
+  }catch(e){ toast('出图失败：'+e.message); }
+  finally{ btn.disabled=false; btn.textContent='生成图片'; }
+}
+
+/* ---------- 视频生成 ---------- */
+let vidImgData = null;
+$('#vidImg').onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { vidImgData = r.result;
+    $('#vidImgPrev').innerHTML = `<img src="${r.result}" style="height:70px;border-radius:6px">`; };
+  r.readAsDataURL(f);
+};
+async function genVideo(){
+  const model = $('#vidModel').value, prompt = $('#vidPrompt').value.trim();
+  if(!model) return toast('请选择视频模型'); if(!prompt) return toast('请输入提示词');
+  const params = {duration:parseInt($('#vidDur').value), ratio:$('#vidRatio').value,
+                  aspect_ratio:$('#vidRatio').value, resolution:$('#vidRes').value};
+  params.video_size = $('#vidRes').value==='1080p' ? '1920*1080' : '1280*720';
+  if(vidImgData) params.image_url = vidImgData;
+  const btn=$('#vidBtn'); btn.disabled=true; btn.textContent='提交中…';
+  try{
+    const r = await fetch('/api/video',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model, prompt, params})});
+    if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    toast('任务已提交，正在生成…', 4000);
+    await loadJobs('video');
+  }catch(e){ toast('提交失败：'+e.message); }
+  finally{ btn.disabled=false; btn.textContent='生成视频'; }
+}
+
+/* ---------- 任务列表 ---------- */
+async function loadJobs(kind){
+  const {items} = await (await fetch('/api/jobs?kind='+kind)).json();
+  const grid = $('#'+(kind==='image'?'imgGrid':'vidGrid'));
+  grid.innerHTML = items.map(j=>{
+    const media = (j.result||[]).map(u => kind==='image'
+      ? `<a href="${u}" target="_blank"><img src="${u}"></a>`
+      : `<video src="${u}" controls></video>`).join('');
+    return `<div class="item">${media}
+      <div class="meta">
+        <div class="st ${j.status}">${j.status==='running'?'⏳ 生成中…':j.status==='succeeded'?'✅ 完成':j.status==='failed'?'❌ 失败':'…'}</div>
+        <div style="margin-top:3px;color:var(--fg)">${esc((j.prompt||'').slice(0,60))}</div>
+        <div style="margin-top:3px">${esc(j.model)}</div>
+        ${j.error?`<div style="color:var(--err);margin-top:4px">${esc(j.error.slice(0,160))}</div>`:''}
+      </div></div>`;
+  }).join('') || '<div class="hint">暂无生成记录</div>';
+  if(items.some(j=>j.status==='running')) setTimeout(()=>loadJobs(kind), 5000);
+}
+
+/* ---------- 配置保存 ---------- */
+async function saveCfg(){
+  const r = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({content:$('#cfgText').value})});
+  if(!r.ok){ toast('保存失败：'+((await r.json()).detail||'')); return; }
+  await loadModels(); toast('配置已保存并重载 ✅', 3000);
+}
+
+/* ---------- 保存目录 ---------- */
+async function loadDirs(){
+  const d = await (await fetch('/api/storage')).json();
+  $('#imgDir').value = d.image_dir; $('#vidDir').value = d.video_dir;
+  $('#imgDirAbs').textContent = '实际路径：' + d.image_abs;
+  $('#vidDirAbs').textContent = '实际路径：' + d.video_abs;
+}
+async function saveDirs(){
+  const r = await fetch('/api/storage',{method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({image_dir:$('#imgDir').value.trim(), video_dir:$('#vidDir').value.trim()})});
+  const d = await r.json();
+  if(!r.ok){ toast('保存失败：'+(d.detail||'')); return; }
+  await loadDirs(); toast('保存目录已更新 ✅', 3000);
+}
+
+/* ---------- 目录浏览器 ---------- */
+let fsTarget = null, fsCur = '';
+function browse(inputId){
+  fsTarget = inputId;
+  $('#fsMask').style.display = 'flex';
+  fsGo($('#'+inputId).value.trim() || '');
+}
+async function fsGo(path){
+  const r = await fetch('/api/fs?path='+encodeURIComponent(path||''));
+  const d = await r.json();
+  if(!r.ok){ toast(d.detail||'无法打开该目录'); return; }
+  fsCur = d.path; $('#fsPath').value = d.path;
+  $('#fsShort').innerHTML = d.shortcuts.map(s=>
+    `<button style="padding:3px 9px;font-size:12px" onclick="fsGo('${s.path.replace(/'/g,"\\'")}')">${esc(s.name)}</button>`).join('')
+    + (d.writable?'<span class="badge ok" style="align-self:center">可写</span>'
+                 :'<span class="badge no" style="align-self:center">只读</span>');
+  $('#fsList').innerHTML = d.dirs.length
+    ? d.dirs.map(n=>`<div class="conv" onclick="fsGo('${(d.path+'/'+n).replace(/'/g,"\\'")}')">📁 ${esc(n)}</div>`).join('')
+    : '<div class="hint" style="padding:10px">（无子目录）</div>';
+}
+function fsUp(){
+  const p = fsCur.replace(/\/+$/,''); const i = p.lastIndexOf('/');
+  fsGo(i > 0 ? p.slice(0,i) : '/');
+}
+async function fsMkdir(){
+  const name = $('#fsNew').value.trim(); if(!name) return;
+  const r = await fetch('/api/fs/mkdir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({path:fsCur, name})});
+  const d = await r.json();
+  if(!r.ok){ toast(d.detail||'创建失败'); return; }
+  $('#fsNew').value=''; fsGo(d.path);
+}
+function fsPick(){
+  if(fsTarget) $('#'+fsTarget).value = fsCur;
+  $('#fsMask').style.display='none';
+}
+
+loadModels(); loadConvs(); loadDirs();
+</script>
+</body>
+</html>
