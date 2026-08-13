@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from .base import ProviderError
+from .base import ProviderError, ref_images
 from .openai_compat import OpenAICompatProvider
 
 
@@ -38,8 +38,9 @@ class ModelScopeProvider(OpenAICompatProvider):
             body["guidance"] = float(params["guidance"])
         if params.get("seed") is not None:
             body["seed"] = int(params["seed"])
-        if params.get("image_url"):  # 图生图
-            body["image_url"] = params["image_url"]
+        refs = ref_images(params)
+        if refs:  # 图生图
+            body["image_url"] = refs[0]
 
         headers = self.headers()
         if self.async_image:

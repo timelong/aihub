@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import mimetypes
 import os
 import time
@@ -10,21 +11,60 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import context as ctx
 from . import providers, storage
-from .config import (MEDIA_DIR, ROOT, load_config, raw_config_text, resolve_dir,
-                     save_config, set_storage_dirs, storage_dirs, storage_raw)
-from .providers.base import ProviderError, is_data_url, split_data_url
+from . import tools as toolkit
+from .config import (MEDIA_DIR, ROOT, defaults_raw, load_config, raw_config_text,
+                     resolve_dir, save_config, set_defaults, set_storage_dirs,
+                     storage_dirs, storage_raw)
+from .logging_setup import preview, setup as setup_logging
+from .providers.base import ProviderError, is_data_url, ref_images, split_data_url
+
+LOG_FILE = setup_logging()
+log = logging.getLogger("aihub")
 
 app = FastAPI(title="AI Hub", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 storage.init()
+log.info("AI Hub 启动，日志文件: %s", LOG_FILE)
+
+
+@app.middleware("http")
+async def access_log(request: Request, call_next):
+    """记录每个接口调用：耗时、状态码；静态资源和媒体文件不记。"""
+    path = request.url.path
+    quiet = path.startswith(("/media/", "/assets/")) or path in ("/", "/favicon.ico")
+    t0 = time.perf_counter()
+    try:
+        resp = await call_next(request)
+    except Exception:
+        log.exception("✗ %s %s 未处理异常", request.method, path)
+        raise
+    ms = (time.perf_counter() - t0) * 1000
+    if not quiet:
+        lvl = logging.WARNING if resp.status_code >= 400 else logging.INFO
+        log.log(lvl, "%s %s → %s %.0fms", request.method, path,
+                resp.status_code, ms)
+    return resp
+
+
+@app.get("/api/logs")
+def api_logs(lines: int = 200) -> dict:
+    """回看最近的日志，方便在界面上排查。"""
+    n = max(1, min(int(lines or 200), 2000))
+    try:
+        content = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+    except FileNotFoundError:
+        content = ""
+    tail = content.splitlines()[-n:]
+    return {"path": str(LOG_FILE), "lines": tail}
 
 
 # ============================ 数据模型 ============================
@@ -35,6 +75,7 @@ class ChatReq(BaseModel):
     images: list[str] = Field(default_factory=list)
     system_prompt: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
+    tools: list[str] = Field(default_factory=list)
     save: bool = True
 
 
@@ -63,6 +104,12 @@ class ConfigReq(BaseModel):
 class StorageReq(BaseModel):
     image_dir: str | None = None
     video_dir: str | None = None
+
+
+class DefaultsReq(BaseModel):
+    chat: str | None = None
+    image: str | None = None
+    video: str | None = None
 
 
 # ============================ 模型 / 配置 ============================
@@ -97,6 +144,40 @@ def api_put_config(req: ConfigReq) -> dict:
     except Exception as e:  # yaml 语法错误等
         raise HTTPException(400, f"配置无效: {e}")
     return {"ok": True}
+
+
+# ============================ 运行时上下文 ============================
+@app.get("/api/context")
+def api_context() -> dict:
+    """当前会注入给模型的时间上下文，前端展示 + 让用户确认时区对不对。"""
+    conf = ctx.chat_conf()
+    t = ctx.now()
+    return {
+        "enabled": bool(conf.get("inject_datetime", True)),
+        "timezone": conf.get("timezone") or str(t.tzinfo),
+        "now": f"{t:%Y-%m-%d %H:%M} {ctx.WEEKDAYS[t.weekday()]}",
+        "note": ctx.datetime_note(),
+    }
+
+
+# ============================ 工具 ============================
+@app.get("/api/tools")
+def api_tools() -> dict:
+    return {"items": toolkit.catalog()}
+
+
+# ============================ 默认模型 ============================
+@app.get("/api/defaults")
+def api_get_defaults() -> dict:
+    return defaults_raw()
+
+
+@app.put("/api/defaults")
+def api_put_defaults(req: DefaultsReq) -> dict:
+    try:
+        return set_defaults(chat=req.chat, image=req.image, video=req.video)
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, f"默认模型无效: {e}")
 
 
 # ============================ 保存目录 ============================
@@ -223,25 +304,43 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
             for m in history]
     params = dict(req.params)
     params["system_prompt"] = req.system_prompt
+    params["tools"] = [t for t in req.tools if t in toolkit.SPECS]
+
+    log.info("对话开始 conv=%s model=%s 历史=%d条 图片=%d张 工具=%s 参数=%s",
+             cid, req.model, len(msgs), len(req.images),
+             params["tools"] or "无", preview(req.params))
 
     async def gen():
         yield _sse({"type": "start", "conversation_id": cid, "model": req.model})
-        buf, think = [], []
+        buf, think, trace = [], [], []
+        t0 = time.perf_counter()
         try:
             async for ev in prov.chat_stream(model_id, msgs, params):
                 if ev["type"] == "delta":
                     buf.append(ev["text"])
                 elif ev["type"] == "reasoning":
                     think.append(ev["text"])
+                elif ev["type"] == "tool_call":
+                    log.info("对话 conv=%s 调用工具 %s args=%s", cid, ev["name"],
+                             preview(ev.get("args")))
+                elif ev["type"] == "tool_result":
+                    log.info("对话 conv=%s 工具结果 %s", cid, preview(ev.get("summary")))
+                    trace.append(f"{ev['name']}: {ev.get('summary', '')}")
                 yield _sse(ev)
         except ProviderError as e:
+            log.error("对话失败 conv=%s model=%s: %s", cid, req.model, e)
             yield _sse({"type": "error", "message": str(e)})
         except Exception as e:  # noqa: BLE001
+            log.exception("对话异常 conv=%s model=%s", cid, req.model)
             yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
         else:
+            text = "".join(buf)
+            log.info("对话完成 conv=%s model=%s 输出%d字 思考%d字 工具%d次 用时%.1fs",
+                     cid, req.model, len(text), len("".join(think)), len(trace),
+                     time.perf_counter() - t0)
             if req.save and cid:
-                storage.add_message(cid, "assistant", "".join(buf),
-                                    reasoning="".join(think), model=req.model)
+                storage.add_message(cid, "assistant", text, reasoning="".join(think),
+                                    model=req.model, tools=trace)
         yield _sse({"type": "end", "conversation_id": cid})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
@@ -256,14 +355,23 @@ async def api_image(req: ImageReq) -> dict:
         prov, model_id = providers.resolve(req.model)
     except Exception as e:
         raise HTTPException(400, str(e))
+    refs = ref_images(req.params)
     job = storage.create_job("image", prov.id, model_id, req.prompt, req.params)
     storage.update_job(job["id"], status="running")
+    log.info("出图开始 job=%s model=%s 参考图%d张 prompt=%s 参数=%s",
+             job["id"], req.model, len(refs), preview(req.prompt, 200),
+             preview({k: v for k, v in req.params.items()
+                      if k not in ("images", "image_url")}))
+    t0 = time.perf_counter()
     try:
         urls = await prov.generate_image(model_id, req.prompt, req.params)
     except Exception as e:  # noqa: BLE001
+        log.error("出图失败 job=%s model=%s: %s", job["id"], req.model, e)
         storage.update_job(job["id"], status="failed", error=str(e))
         raise HTTPException(502, str(e))
     local = [await _persist(u, "png", "image") for u in urls]
+    log.info("出图成功 job=%s 用时%.1fs 结果=%s", job["id"],
+             time.perf_counter() - t0, local)
     storage.update_job(job["id"], status="succeeded", result=local)
     return storage.get_job(job["id"])
 
@@ -276,11 +384,16 @@ async def api_video(req: VideoReq, bg: BackgroundTasks) -> dict:
     except Exception as e:
         raise HTTPException(400, str(e))
     job = storage.create_job("video", prov.id, model_id, req.prompt, req.params)
+    log.info("视频提交 job=%s model=%s prompt=%s 参数=%s", job["id"], req.model,
+             preview(req.prompt, 200),
+             preview({k: v for k, v in req.params.items() if k != "image_url"}))
     try:
         remote = await prov.submit_video(model_id, req.prompt, req.params)
     except Exception as e:  # noqa: BLE001
+        log.error("视频提交失败 job=%s: %s", job["id"], e)
         storage.update_job(job["id"], status="failed", error=str(e))
         raise HTTPException(502, str(e))
+    log.info("视频任务已受理 job=%s remote=%s", job["id"], remote)
     storage.update_job(job["id"], status="running", remote_id=remote)
     bg.add_task(_watch_video, job["id"], prov.id, model_id, remote)
     return storage.get_job(job["id"])
@@ -294,15 +407,19 @@ async def _watch_video(jid: str, pid: str, model_id: str, remote: str) -> None:
         try:
             st = await prov.poll_video(model_id, remote)
         except Exception as e:  # noqa: BLE001
+            log.error("视频轮询异常 job=%s: %s", jid, e)
             storage.update_job(jid, status="failed", error=str(e))
             return
         if st["status"] == "succeeded":
             local = [await _persist(u, "mp4", "video") for u in st.get("urls", [])]
+            log.info("视频完成 job=%s 结果=%s", jid, local)
             storage.update_job(jid, status="succeeded", result=local)
             return
         if st["status"] == "failed":
+            log.error("视频失败 job=%s: %s", jid, st.get("error", ""))
             storage.update_job(jid, status="failed", error=st.get("error", ""))
             return
+    log.error("视频轮询超时 job=%s", jid)
     storage.update_job(jid, status="failed", error="轮询超时（30 分钟）")
 
 
@@ -334,7 +451,8 @@ async def _persist(url: str, ext: str, kind: str = "image") -> str:
                 r = await cli.get(url)
                 r.raise_for_status()
                 (base / name).write_bytes(r.content)
-    except Exception:  # 下载/写盘失败就直接返回原始 URL
+    except Exception as e:  # noqa: BLE001  # 下载/写盘失败就直接返回原始 URL
+        log.warning("结果落盘失败（回退为远端 URL）: %s | %s", e, preview(url, 120))
         return url
     return f"/media/{kind}/{name}"
 
@@ -373,8 +491,10 @@ if WEB_DIR.is_dir():
 def main() -> None:
     import uvicorn
     import os
+    # log_config=None：不让 uvicorn 覆盖我们的 handler，日志统一进 data/logs/aihub.log
     uvicorn.run("app.main:app", host=os.getenv("HOST", "127.0.0.1"),
-                port=int(os.getenv("PORT", "8000")), reload=False)
+                port=int(os.getenv("PORT", "8000")), reload=False,
+                log_config=None, access_log=False)
 
 
 if __name__ == "__main__":

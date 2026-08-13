@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import ProviderError
+from .base import ProviderError, ref_images
 from .openai_compat import OpenAICompatProvider
 
 
@@ -19,8 +19,9 @@ class ArkProvider(OpenAICompatProvider):
             "response_format": "url",
             "watermark": bool(params.get("watermark", False)),
         }
-        if params.get("image_url"):
-            body["image"] = params["image_url"]
+        refs = ref_images(params)          # 即梦支持 URL 或 base64，多图组图传数组
+        if refs:
+            body["image"] = refs[0] if len(refs) == 1 else refs
         if params.get("seed") is not None:
             body["seed"] = int(params["seed"])
         async with self.client() as cli:

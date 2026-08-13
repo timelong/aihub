@@ -21,4 +21,6 @@ fi
 HOST=${HOST:-127.0.0.1}
 PORT=${PORT:-8000}
 echo "▶ 服务启动: http://${HOST}:${PORT}"
-exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT"
+echo "▶ 运行日志: ${AIHUB_LOG_DIR:-$(pwd)/data/logs}/aihub.log"
+# 日志统一由 app/logging_setup.py 接管（控制台 + 滚动文件），access log 我们自己打
+exec python -m uvicorn app.main:app --host "$HOST" --port "$PORT" --no-access-log

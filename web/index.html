@@ -80,6 +80,16 @@
             overflow:auto;white-space:pre}
   .think{border-left:2px solid var(--line);padding:6px 0 6px 12px;margin-bottom:8px;
          color:var(--dim);font-size:13px;white-space:pre-wrap}
+  .tools{margin-bottom:8px;display:flex;flex-direction:column;gap:4px}
+  .tools .t{font-size:12.5px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);
+            border-radius:8px;padding:5px 9px;display:flex;gap:6px;align-items:center}
+  .tools .t b{color:var(--accent2);font-weight:600}
+  .tbtn{padding:6px 10px;font-size:12.5px;color:var(--dim)}
+  .tbtn.on{border-color:var(--accent);color:var(--fg);background:#232936}
+  .tbtn.on::before{content:"✓ "}
+  #logBox{background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:10px;
+          font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;
+          max-height:420px;overflow:auto;white-space:pre-wrap}
   .imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .imgs img{max-height:150px;border-radius:8px;border:1px solid var(--line)}
   .composer{border-top:1px solid var(--line);padding:14px 24px;background:var(--panel)}
@@ -130,6 +140,8 @@
     <div class="topbar" id="chatBar">
       <select id="chatModel"></select>
       <button onclick="togglePanel()">参数</button>
+      <span class="hint" style="margin-left:4px">工具</span>
+      <div id="toolBar" style="display:flex;gap:6px"></div>
       <div class="spacer"></div>
       <span class="hint" id="chatHint"></span>
     </div>
@@ -149,6 +161,12 @@
                    oninput="pLbl.textContent=this.value"></div>
           <div class="field"><label>Max Tokens</label>
             <input type="number" id="maxTok" placeholder="留空使用默认"></div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:6px;color:var(--fg)">
+              <input type="checkbox" id="injTime" checked style="width:auto"> 注入当前时间
+            </label>
+            <span class="hint" id="injTimeNow"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -180,6 +198,15 @@
               <textarea id="imgPrompt" rows="4" placeholder="一只穿着宇航服的柴犬，站在月球表面，电影感光影"></textarea></div>
             <div class="field"><label>负向提示词（可选）</label>
               <input id="imgNeg" placeholder="低质量, 模糊, 变形"></div>
+            <div class="field">
+              <label>参考图（图生图 / 图片编辑，可多张，可选）</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="file" id="imgRef" accept="image/*" multiple>
+                <button style="white-space:nowrap" onclick="clearRefs()">清空</button>
+              </div>
+              <div class="attach" id="imgRefPrev" style="margin-top:8px"></div>
+              <div class="hint" id="imgRefHint" style="margin-top:4px"></div>
+            </div>
           </div>
           <div class="col" style="max-width:280px">
             <div class="field"><label>尺寸</label>
@@ -233,6 +260,23 @@
         <div id="provList"></div>
       </div>
       <div class="card" style="margin-bottom:16px">
+        <h3>⭐️ 默认模型</h3>
+        <div class="row">
+          <div class="col">
+            <div class="field"><label>默认对话模型</label><select id="defChat"></select></div>
+          </div>
+          <div class="col">
+            <div class="field"><label>默认出图模型</label><select id="defImage"></select></div>
+          </div>
+          <div class="col">
+            <div class="field"><label>默认视频模型</label><select id="defVideo"></select></div>
+          </div>
+        </div>
+        <button class="primary" onclick="saveDefaults()">保存默认模型</button>
+        <span class="hint" style="margin-left:10px">保存后写入 config.yaml 的 <code>defaults</code>，以后打开页面/新建会话都会默认选中它</span>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
         <h3>📁 保存目录</h3>
         <div class="row">
           <div class="col">
@@ -256,6 +300,19 @@
         </div>
         <button class="primary" onclick="saveDirs()">保存目录设置</button>
         <span class="hint" style="margin-left:10px">支持绝对路径、<code>~/</code> 开头或相对工程根目录的相对路径</span>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h3>📜 运行日志
+          <span style="float:right;display:flex;gap:8px">
+            <label class="hint" style="display:flex;align-items:center;gap:4px">
+              <input type="checkbox" id="logAuto" style="width:auto"> 自动刷新
+            </label>
+            <button onclick="loadLogs()">刷新</button>
+          </span>
+        </h3>
+        <div class="hint" id="logPath" style="margin-bottom:8px"></div>
+        <div id="logBox">（点刷新加载）</div>
       </div>
 
       <div class="card">
@@ -298,6 +355,8 @@
 <script>
 const $ = s => document.querySelector(s);
 let CFG = {providers:[], defaults:{}}, convId = null, pending = [], ctrl = null;
+let TOOLS = [], activeTools = new Set(JSON.parse(localStorage.getItem('aihub_tools') || '[]'));
+let imgRefs = [];   // 图生图参考图（data URL）
 
 function toast(msg, ms=6000){ const t=$('#toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms); }
@@ -320,14 +379,17 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   $('#chatParams').style.display = 'none';
   if(p==='image') loadJobs('image');
   if(p==='video') loadJobs('video');
+  if(p==='settings') loadLogs();
 });
 const togglePanel = () => { const e=$('#chatParams'); e.style.display = e.style.display==='none'?'block':'none'; };
 
 /* ---------- 加载模型 ---------- */
 async function loadModels(){
   CFG = await (await fetch('/api/models')).json();
-  const fill = (sel, cap) => {
+  const fill = (sel, cap, blank) => {
     sel.innerHTML='';
+    if(blank){ const o=document.createElement('option'); o.value=''; o.textContent='（不设置）';
+               sel.appendChild(o); }
     CFG.providers.forEach(p=>{
       const list = p[cap]||[]; if(!list.length) return;
       const g = document.createElement('optgroup');
@@ -335,17 +397,19 @@ async function loadModels(){
       list.forEach(m=>{
         const o = document.createElement('option');
         o.value = p.id+'/'+m.id; o.textContent = m.name || m.id;
-        o.dataset.vision = m.vision?'1':''; g.appendChild(o);
+        o.dataset.vision = m.vision?'1':'';
+        o.dataset.imageInput = m.image_input?'1':'';
+        g.appendChild(o);
       });
       sel.appendChild(g);
     });
   };
   fill($('#chatModel'),'chat'); fill($('#imgModel'),'image'); fill($('#vidModel'),'video');
+  fill($('#defChat'),'chat',true); fill($('#defImage'),'image',true); fill($('#defVideo'),'video',true);
+  applyDefaults();
   const d = CFG.defaults||{};
-  if(d.chat) $('#chatModel').value = d.chat;
-  if(d.image) $('#imgModel').value = d.image;
-  if(d.video) $('#vidModel').value = d.video;
-  updHint();
+  $('#defChat').value = d.chat||''; $('#defImage').value = d.image||'';
+  $('#defVideo').value = d.video||'';
   $('#provList').innerHTML = CFG.providers.map(p=>`
     <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">
       <b style="width:150px">${esc(p.name)}</b>
@@ -355,6 +419,37 @@ async function loadModels(){
       <span class="hint">对话 ${p.chat.length} · 图片 ${p.image.length} · 视频 ${p.video.length}</span>
     </div>`).join('');
   $('#cfgText').value = (await (await fetch('/api/config')).json()).content;
+}
+/* ---------- 时间上下文 ---------- */
+async function loadContext(){
+  const d = await (await fetch('/api/context')).json();
+  $('#injTime').checked = d.enabled;
+  $('#injTimeNow').textContent = `会告诉模型：${d.now}（${d.timezone}）`;
+  $('#injTimeNow').title = d.note;
+}
+
+/* ---------- 工具 ---------- */
+async function loadTools(){
+  TOOLS = (await (await fetch('/api/tools')).json()).items || [];
+  $('#toolBar').innerHTML = TOOLS.map(t=>
+    `<button class="tbtn ${activeTools.has(t.name)?'on':''}" data-tool="${t.name}"
+       title="${esc(t.desc)}${t.backend?'（'+esc(t.backend)+'）':''}">${esc(t.label)}</button>`).join('');
+  $('#toolBar').querySelectorAll('.tbtn').forEach(b=>b.onclick=()=>{
+    const n = b.dataset.tool;
+    activeTools.has(n) ? activeTools.delete(n) : activeTools.add(n);
+    b.classList.toggle('on');
+    localStorage.setItem('aihub_tools', JSON.stringify([...activeTools]));
+  });
+}
+
+/* 把 config.yaml 里的 defaults 应用到三个选择器 */
+function applyDefaults(){
+  const d = CFG.defaults||{};
+  [['chat','#chatModel'],['image','#imgModel'],['video','#vidModel']].forEach(([cap,sel])=>{
+    const el = $(sel), ref = d[cap];
+    if(ref && [...el.options].some(o=>o.value===ref)) el.value = ref;
+  });
+  updHint();
 }
 $('#chatModel').onchange = updHint;
 function updHint(){
@@ -371,24 +466,26 @@ async function loadConvs(){
       <span class="x" onclick="event.stopPropagation();delConv('${c.id}')">✕</span>
     </div>`).join('') || '<div class="hint" style="padding:6px">暂无会话</div>';
 }
-function newConv(){ convId=null; $('#msgs').innerHTML=''; loadConvs(); }
+function newConv(){ convId=null; $('#msgs').innerHTML=''; applyDefaults(); loadConvs(); }
 async function delConv(id){ await fetch('/api/conversations/'+id,{method:'DELETE'});
   if(id===convId) newConv(); else loadConvs(); }
 async function openConv(id){
   const c = await (await fetch('/api/conversations/'+id)).json();
   convId = id; $('#msgs').innerHTML='';
-  c.messages.forEach(m=>addMsg(m.role, m.content, m.images, m.reasoning));
+  c.messages.forEach(m=>addMsg(m.role, m.content, m.images, m.reasoning, m.tools));
   if(c.system_prompt) $('#sysPrompt').value = c.system_prompt;
   if(c.model) $('#chatModel').value = c.model;
   loadConvs();
 }
 
 /* ---------- 消息渲染 ---------- */
-function addMsg(role, text, images, reasoning){
+function addMsg(role, text, images, reasoning, tools){
   const wrap = document.createElement('div');
   wrap.className = 'msg '+role;
+  const tls = (tools||[]).map(t=>`<div class="t">🔧 ${esc(t)}</div>`).join('');
   wrap.innerHTML = `<div class="ava">${role==='user'?'我':'AI'}</div>
     <div class="bubble"><div class="who">${role==='user'?'你':'助手'}</div>
+      <div class="tools"${tls?'':' style="display:none"'}>${tls}</div>
       ${reasoning?`<div class="think">${esc(reasoning)}</div>`:'<div class="think" style="display:none"></div>'}
       <div class="body">${md(text)}</div>
       <div class="imgs">${(images||[]).map(u=>`<img src="${u}">`).join('')}</div></div>`;
@@ -431,6 +528,7 @@ async function send(){
   const node = addMsg('assistant','');
   const bodyEl = node.querySelector('.body');
   const thinkEl = node.querySelector('.think');
+  const toolsEl = node.querySelector('.tools');
   bodyEl.innerHTML = '<span class="spin"></span>';
   $('#sendBtn').disabled = true; $('#stopBtn').style.display='inline-block';
 
@@ -438,6 +536,7 @@ async function send(){
   const t = parseFloat($('#temp').value); if(!isNaN(t)) params.temperature = t;
   const p = parseFloat($('#topp').value); if(!isNaN(p) && p<1) params.top_p = p;
   const mt = parseInt($('#maxTok').value); if(mt) params.max_tokens = mt;
+  params.inject_datetime = $('#injTime').checked;
 
   ctrl = new AbortController();
   let acc='', think='';
@@ -445,7 +544,8 @@ async function send(){
     const resp = await fetch('/api/chat', {
       method:'POST', headers:{'Content-Type':'application/json'}, signal: ctrl.signal,
       body: JSON.stringify({conversation_id:convId, model, message:text, images:imgs,
-                            system_prompt:$('#sysPrompt').value, params})
+                            system_prompt:$('#sysPrompt').value, params,
+                            tools:[...activeTools]})
     });
     if(!resp.ok) throw new Error(await resp.text());
     const reader = resp.body.getReader(), dec = new TextDecoder();
@@ -461,6 +561,22 @@ async function send(){
         else if(ev.type==='reasoning'){ think += ev.text; thinkEl.style.display='block';
           thinkEl.textContent = '💭 ' + think; }
         else if(ev.type==='delta'){ acc += ev.text; bodyEl.innerHTML = md(acc); }
+        else if(ev.type==='tool_call'){
+          toolsEl.style.display='flex';
+          const line = document.createElement('div');
+          line.className='t';
+          const label = (TOOLS.find(t=>t.name===ev.name)||{}).label || ev.name;
+          line.innerHTML = `<span class="spin"></span><b>${esc(label)}</b> ${esc(
+            ev.args && ev.args.query ? ev.args.query : (ev.args && ev.args.url) || '')}`;
+          line.dataset.tool = ev.name;
+          toolsEl.appendChild(line);
+        }
+        else if(ev.type==='tool_result'){
+          const lines = [...toolsEl.querySelectorAll('.t')].filter(l=>l.dataset.tool===ev.name);
+          const line = lines[lines.length-1] || toolsEl.appendChild(
+            Object.assign(document.createElement('div'),{className:'t'}));
+          line.innerHTML = `🔧 ${esc(ev.summary||'')}`;
+        }
         else if(ev.type==='error'){ toast('生成失败：'+ev.message);
           bodyEl.innerHTML = `<span style="color:var(--err)">⚠ ${esc(ev.message)}</span>`; }
         else if(ev.type==='end'){ convId = ev.conversation_id || convId; }
@@ -480,12 +596,37 @@ $('#input').addEventListener('input', function(){ this.style.height='auto';
   this.style.height = Math.min(this.scrollHeight, 220)+'px'; });
 
 /* ---------- 图片生成 ---------- */
+$('#imgRef').onchange = e => {
+  [...e.target.files].forEach(f=>{
+    const r = new FileReader();
+    r.onload = () => { imgRefs.push(r.result); renderRefs(); };
+    r.readAsDataURL(f);
+  });
+  e.target.value='';
+};
+function renderRefs(){
+  $('#imgRefPrev').innerHTML = imgRefs.map((u,i)=>
+    `<div class="t"><img src="${u}"><button class="rm" onclick="imgRefs.splice(${i},1);renderRefs()">✕</button></div>`).join('');
+  updImgHint();
+}
+function clearRefs(){ imgRefs = []; renderRefs(); }
+$('#imgModel').onchange = updImgHint;
+function updImgHint(){
+  const o = $('#imgModel').selectedOptions[0];
+  if(!imgRefs.length){ $('#imgRefHint').textContent =
+      '不传参考图即为文生图；传了就走图生图/图片编辑。'; return; }
+  $('#imgRefHint').innerHTML = o && o.dataset.imageInput
+    ? `已选 ${imgRefs.length} 张参考图，将走图生图。`
+    : `已选 ${imgRefs.length} 张参考图，但该模型在 config.yaml 里没标记 <code>image_input: true</code>，`
+      + `如果服务商不支持会直接报错。`;
+}
 async function genImage(){
   const model = $('#imgModel').value, prompt = $('#imgPrompt').value.trim();
   if(!model) return toast('请选择出图模型'); if(!prompt) return toast('请输入提示词');
   const params = {size:$('#imgSize').value, n:parseInt($('#imgN').value)||1};
   if($('#imgNeg').value.trim()) params.negative_prompt = $('#imgNeg').value.trim();
   if($('#imgSeed').value) params.seed = parseInt($('#imgSeed').value);
+  if(imgRefs.length){ params.images = imgRefs; params.image_url = imgRefs[0]; }
   const btn = $('#imgBtn'); btn.disabled=true; btn.textContent='生成中…';
   try{
     const r = await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -547,7 +688,35 @@ async function saveCfg(){
   const r = await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({content:$('#cfgText').value})});
   if(!r.ok){ toast('保存失败：'+((await r.json()).detail||'')); return; }
-  await loadModels(); toast('配置已保存并重载 ✅', 3000);
+  await loadModels(); await loadContext(); toast('配置已保存并重载 ✅', 3000);
+}
+
+/* ---------- 运行日志 ---------- */
+let logTimer = null;
+async function loadLogs(){
+  const d = await (await fetch('/api/logs?lines=400')).json();
+  $('#logPath').textContent = '日志文件：' + d.path;
+  const box = $('#logBox');
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  box.textContent = (d.lines||[]).join('\n') || '（暂无日志）';
+  if(atBottom) box.scrollTop = box.scrollHeight;
+}
+$('#logAuto').onchange = e => {
+  clearInterval(logTimer);
+  if(e.target.checked){ loadLogs(); logTimer = setInterval(loadLogs, 3000); }
+};
+
+/* ---------- 默认模型 ---------- */
+async function saveDefaults(){
+  const r = await fetch('/api/defaults',{method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chat:$('#defChat').value, image:$('#defImage').value,
+                         video:$('#defVideo').value})});
+  const d = await r.json();
+  if(!r.ok){ toast('保存失败：'+(d.detail||'')); return; }
+  CFG.defaults = d;
+  $('#cfgText').value = (await (await fetch('/api/config')).json()).content;
+  if(!convId) applyDefaults();
+  toast('默认模型已保存 ✅', 3000);
 }
 
 /* ---------- 保存目录 ---------- */
@@ -602,7 +771,7 @@ function fsPick(){
   $('#fsMask').style.display='none';
 }
 
-loadModels(); loadConvs(); loadDirs();
+loadModels(); loadConvs(); loadDirs(); loadTools(); loadContext(); updImgHint();
 </script>
 </body>
 </html>

@@ -14,6 +14,14 @@
 #
 # models 下按能力分组: chat / image / video
 # 留空的分组表示该 provider 不提供该能力。
+#
+# 模型可加的标记:
+#   vision: true       对话模型能看图
+#   image_input: true  出图/视频模型支持传参考图（图生图 / 图生视频）
+#
+# provider 级可选:
+#   image_edit_mode: json   OpenAI 兼容接口的图生图改走 /images/generations
+#                           的 image 字段（默认走 /images/edits 上传文件）
 # ==========================================================
 
 providers:
@@ -33,6 +41,7 @@ providers:
       image:
         - id: gpt-image-1
           name: GPT Image 1
+          image_input: true      # 支持传参考图做编辑（走 /images/edits）
         - id: dall-e-3
           name: DALL·E 3
       video: []
@@ -93,18 +102,18 @@ providers:
       chat:
         - id: Qwen/Qwen3-235B-A22B-Instruct-2507
           name: Qwen3-235B-A22B
-        - id: deepseek-ai/DeepSeek-V3.1
-          name: DeepSeek-V3.1
+        - id: deepseek-ai/DeepSeek-V4-Pro
+          name: DeepSeek-V4-Pro
         - id: ZhipuAI/GLM-4.5
           name: GLM-4.5
         - id: Qwen/Qwen2.5-VL-72B-Instruct
           name: Qwen2.5-VL-72B (视觉)
           vision: true
       image:
-        - id: Qwen/Qwen-Image
+        - id: Qwen/Qwen-Image-2512
           name: Qwen-Image 文生图
-        - id: MusePublic/489_ckpt_FLUX_1
-          name: FLUX.1 dev
+        - id: Qwen/Qwen-Image-Edit-2511
+          name: Qwen-Image 图生图
         - id: MAILAND/majicflus_v1
           name: majicFlus 写实
       video: []
@@ -127,6 +136,7 @@ providers:
           name: Imagen 4
         - id: gemini-2.5-flash-image
           name: Gemini Flash Image (Nano Banana)
+          image_input: true      # 支持传参考图做编辑
       video:
         - id: veo-3.0-generate-001
           name: Veo 3
@@ -169,6 +179,7 @@ providers:
       image:
         - id: doubao-seedream-4-0-250828
           name: 即梦 Seedream 4.0
+          image_input: true      # 支持单图/多图参考（组图）
       video:
         - id: doubao-seedance-1-0-pro-250528
           name: 即梦 Seedance 1.0 Pro
@@ -205,8 +216,20 @@ storage:
   image_dir: data/media/images
   video_dir: data/media/videos
 
+# ==========================================================
+# 对话行为
+# inject_datetime: 每次请求在 system prompt 前自动加一段"当前时间"说明，
+#   否则模型只知道训练数据里的日期，问"今天几号""最近"就会答错。
+# timezone: 留空用服务器系统时区，也可写 Asia/Shanghai、UTC 等。
+# extra: 想给所有对话都加的固定说明（比如回答风格），拼在时间说明后面。
+# ==========================================================
+chat:
+  inject_datetime: true
+  timezone: Asia/Shanghai
+  extra: ""
+
 # 默认选中的模型
 defaults:
-  chat: "deepseek/deepseek-chat"
-  image: "dashscope/wan2.2-t2i-flash"
+  chat: "modelscope/deepseek-ai/DeepSeek-V4-Pro"
+  image: "modelscope/Qwen/Qwen-Image-2512"
   video: "dashscope/wan2.2-t2v-plus"

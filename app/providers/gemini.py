@@ -4,7 +4,16 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncIterator
 
-from .base import BaseProvider, ProviderError, is_data_url, split_data_url
+import base64
+
+from ..context import build_system_prompt
+from .base import BaseProvider, ProviderError, is_data_url, ref_images, split_data_url
+
+
+def _inline_part(data_url: str) -> dict:
+    mime, raw = split_data_url(data_url)
+    return {"inline_data": {"mime_type": mime,
+                            "data": base64.b64encode(raw).decode()}}
 
 
 def _to_gemini_contents(messages: list[dict]) -> list[dict]:
@@ -16,10 +25,7 @@ def _to_gemini_contents(messages: list[dict]) -> list[dict]:
             parts.append({"text": m["content"]})
         for u in m.get("images") or []:
             if is_data_url(u):
-                mime, raw = split_data_url(u)
-                import base64
-                parts.append({"inline_data": {"mime_type": mime,
-                                              "data": base64.b64encode(raw).decode()}})
+                parts.append(_inline_part(u))
         if parts:
             contents.append({"role": role, "parts": parts})
     return contents
@@ -44,10 +50,16 @@ class GeminiProvider(BaseProvider):
             gen["maxOutputTokens"] = int(params["max_tokens"])
         if gen:
             body["generationConfig"] = gen
-        if params.get("system_prompt"):
-            body["systemInstruction"] = {"parts": [{"text": params["system_prompt"]}]}
+        sys_prompt = build_system_prompt(params)
+        if sys_prompt:
+            body["systemInstruction"] = {"parts": [{"text": sys_prompt}]}
+        # Gemini 用自带的 Google 搜索接地，不走我们的 function calling
+        want_search = "web_search" in (params.get("tools") or [])
+        if want_search:
+            body["tools"] = [{"google_search": {}}]
 
         url = f"{self.base_url}/models/{model}:streamGenerateContent?alt=sse"
+        announced = False
         async with self.client() as cli:
             async with cli.stream("POST", url, headers=self._headers(), json=body) as resp:
                 if resp.status_code >= 400:
@@ -61,6 +73,19 @@ class GeminiProvider(BaseProvider):
                     except json.JSONDecodeError:
                         continue
                     for cand in chunk.get("candidates", []):
+                        gm = cand.get("groundingMetadata") or {}
+                        if want_search and not announced and gm:
+                            announced = True
+                            queries = gm.get("webSearchQueries") or []
+                            yield {"type": "tool_call", "name": "google_search",
+                                   "args": {"query": "；".join(queries)}}
+                            sources = [
+                                (c.get("web") or {}).get("title", "")
+                                for c in (gm.get("groundingChunks") or [])
+                            ]
+                            yield {"type": "tool_result", "name": "google_search",
+                                   "summary": f"Gemini 内置搜索 → {len(sources)} 个来源 "
+                                              + "；".join(s for s in sources[:3] if s)}
                         for p in (cand.get("content") or {}).get("parts", []):
                             if p.get("thought") and p.get("text"):
                                 yield {"type": "reasoning", "text": p["text"]}
@@ -70,7 +95,10 @@ class GeminiProvider(BaseProvider):
 
     async def generate_image(self, model: str, prompt: str, params: dict) -> list[str]:
         self.require_key()
+        refs = ref_images(params)
         if model.startswith("imagen"):
+            if refs:
+                raise ProviderError("Imagen 只支持文生图，图生图请选 Gemini Flash Image")
             body = {"instances": [{"prompt": prompt}],
                     "parameters": {"sampleCount": int(params.get("n", 1)),
                                    "aspectRatio": params.get("aspect_ratio", "1:1")}}
@@ -81,7 +109,12 @@ class GeminiProvider(BaseProvider):
                     for p in data.get("predictions", []) if p.get("bytesBase64Encoded")]
         else:  # gemini-*-image：走 generateContent
             url = f"{self.base_url}/models/{model}:generateContent"
-            body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+            parts: list[dict] = [{"text": prompt}]
+            for u in refs:  # 图生图 / 图片编辑：参考图直接作为 inline_data 传进去
+                if not is_data_url(u):
+                    raise ProviderError("Gemini 参考图需为上传的本地图片")
+                parts.append(_inline_part(u))
+            body = {"contents": [{"role": "user", "parts": parts}]}
             async with self.client() as cli:
                 data = self.check(await cli.post(url, headers=self._headers(), json=body))
             urls = []

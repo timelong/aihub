@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import ProviderError
+from .base import ProviderError, ref_images
 from .openai_compat import OpenAICompatProvider
 
 
@@ -12,6 +12,8 @@ class ZhipuProvider(OpenAICompatProvider):
 
     async def generate_image(self, model: str, prompt: str, params: dict) -> list[str]:
         self.require_key()
+        if ref_images(params):
+            self.no_image_input()
         body: dict[str, Any] = {"model": model, "prompt": prompt,
                                 "size": params.get("size", "1024x1024")}
         async with self.client() as cli:

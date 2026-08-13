@@ -96,10 +96,46 @@ defaults:                    # 各页面默认选中的模型
 - 多轮上下文，会话自动持久化到 SQLite，左侧可切换/删除
 - 多模态：点 🖼 上传图片提问（模型需标记 `vision: true`）
 - 推理模型（DeepSeek R1、Gemini thinking）的思维链单独灰色展示
-- 参数面板：System Prompt、Temperature、Top P、Max Tokens
+- 参数面板：System Prompt、Temperature、Top P、Max Tokens、注入当前时间
+- **工具（联网搜索 / 网页抓取）**：见下方「工具」一节
+
+**🕒 当前时间注入**
+- 模型只知道训练数据里的日期，问「今天几号」「最近」会答错，所以每次请求都会在
+  system prompt 前自动加一段当前时间说明（日期、时刻、星期、时区），并要求它以此为基准
+- Web 和 `cli.py` 都生效（注入点在 provider 层）；参数面板可临时关掉，也能看到会告诉模型的时间
+- 时区取 `config.yaml` 的 `chat.timezone`，留空则用服务器系统时区：
+
+```yaml
+chat:
+  inject_datetime: true       # 关掉写 false
+  timezone: Asia/Shanghai     # 留空用系统时区
+  extra: ""                   # 想给所有对话都加的固定说明
+```
+
+**🔧 工具**
+- 顶栏「工具」处点亮即可启用，选择记在浏览器本地，下次进来还在
+- `联网搜索`：模型自己决定要不要搜、搜什么词，服务端执行后把结果回灌给模型
+- `网页抓取`：按 URL 打开网页取正文，一般配合搜索结果使用
+- 走标准 OpenAI function calling，任何支持 tools 的模型都能用；最多连续 5 轮工具调用。
+  Gemini 例外：直接启用它自带的 Google 搜索接地
+- 搜索后端按 key 自动选择，都没配就兜底抓 Bing 网页（可能被限流）：
+
+```dotenv
+TAVILY_API_KEY=      # 首选，专为 LLM 设计
+BOCHA_API_KEY=       # 博查，国内直连
+```
+
+- 界面上会实时显示「调用了什么工具、搜到几条」，这条轨迹也会随会话存库
 
 **🎨 图片生成**
 - 提示词 / 负向提示词 / 尺寸 / 数量 / 种子
+- **图生图 / 图片编辑**：上传参考图（可多张）即从文生图切到图生图。
+  已支持：OpenAI 兼容接口（`/images/edits`）、火山方舟即梦 Seedream、
+  Gemini Flash Image、魔搭；阿里百炼与智谱的图生图要求公网图片 URL，
+  上传本地图会给出明确报错。
+  在 `config.yaml` 给模型加 `image_input: true` 后，界面会提示该模型支持图生图；
+  个别兼容服务（如硅基流动）的图生图是在 `/images/generations` 传 `image` 字段，
+  给该 provider 加 `image_edit_mode: json` 即可
 - 结果自动下载到本地（第三方图床链接通常 24h 过期，本地留存不怕丢）
 - **保存目录可配置**：见下方「保存目录」一节
 
@@ -121,6 +157,20 @@ storage:
 - 时长 / 比例 / 分辨率
 - 异步任务：提交后后台轮询，界面每 5 秒自动刷新状态
 
+**📜 运行日志**
+- 控制台 + 文件双写，默认落在 `data/logs/aihub.log`，10MB 滚动保留 5 份
+- 记录内容：每个接口的方法/路径/状态码/耗时、上游 API 的请求与响应（含状态码和耗时）、
+  对话的模型与工具调用轨迹、出图/视频任务的开始与结果、异常堆栈
+- 密钥会被自动打码，base64 图片会被压成 `<data:image/png base64 12345B>`，不会把日志刷爆
+- 在「⚙️ 模型配置 → 📜 运行日志」可以直接看最近 400 行，支持自动刷新
+- 环境变量：
+
+```dotenv
+AIHUB_LOG_DIR=          # 日志目录，默认 data/logs
+AIHUB_LOG_LEVEL=INFO    # 设 DEBUG 会额外记录请求体/响应体预览
+AIHUB_LOG_BODY=800      # 请求/响应预览截断长度
+```
+
 ---
 
 ## 五、目录结构
@@ -129,7 +179,10 @@ storage:
 aihub/
 ├── app/
 │   ├── main.py              # FastAPI 路由：chat(SSE) / image / video / jobs / config
-│   ├── config.py            # config.yaml + .env 加载与 ${VAR} 插值
+│   ├── config.py            # config.yaml + .env 加载与 ${VAR} 插值、默认模型、保存目录
+│   ├── logging_setup.py     # 日志：控制台 + data/logs/aihub.log 滚动文件、密钥打码
+│   ├── tools.py             # 对话工具：联网搜索（Tavily/博查/Bing）、网页抓取
+│   ├── context.py           # 运行时上下文注入：当前时间/时区
 │   ├── storage.py           # SQLite：会话、消息、生成任务
 │   └── providers/
 │       ├── base.py          # 抽象基类 chat_stream / generate_image / submit_video / poll_video
@@ -173,6 +226,10 @@ class MyProvider(BaseProvider):
 | GET | `/api/models` | 所有服务商 / 模型 / Key 配置状态 |
 | GET·PUT | `/api/config` | 读取 / 保存 config.yaml（热重载） |
 | GET·PUT | `/api/storage` | 读取 / 设置图片与视频保存目录 |
+| GET·PUT | `/api/defaults` | 读取 / 设置各能力的默认模型 |
+| GET | `/api/tools` | 可用工具清单（含当前搜索后端） |
+| GET | `/api/context` | 当前会注入给模型的时间上下文 |
+| GET | `/api/logs?lines=` | 回看最近若干行运行日志 |
 | GET | `/api/fs?path=` | 浏览服务器目录（目录选择器用） |
 | POST | `/api/fs/mkdir` | 新建文件夹 |
 | POST | `/api/chat` | 流式对话（SSE） |

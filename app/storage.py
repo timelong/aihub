@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     images TEXT DEFAULT '[]',
     reasoning TEXT DEFAULT '',
+    tools TEXT DEFAULT '[]',
     model TEXT,
     created_at REAL,
     FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -60,6 +61,9 @@ def _conn() -> sqlite3.Connection:
 def init() -> None:
     with _conn() as c:
         c.executescript(SCHEMA)
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(messages)")}
+        if "tools" not in cols:  # 老库补上工具调用轨迹字段
+            c.execute("ALTER TABLE messages ADD COLUMN tools TEXT DEFAULT '[]'")
 
 
 def _now() -> float:
@@ -102,7 +106,8 @@ def get_conversation(cid: str) -> dict | None:
             "SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at", (cid,)
         ).fetchall()
     conv["messages"] = [
-        {**dict(m), "images": json.loads(m["images"] or "[]")} for m in msgs
+        {**dict(m), "images": json.loads(m["images"] or "[]"),
+         "tools": json.loads((dict(m).get("tools") or "[]"))} for m in msgs
     ]
     return conv
 
@@ -125,14 +130,15 @@ def delete_conversation(cid: str) -> None:
 
 
 def add_message(cid: str, role: str, content: str, images: list | None = None,
-                reasoning: str = "", model: str = "") -> dict:
+                reasoning: str = "", model: str = "", tools: list | None = None) -> dict:
     mid = new_id()
     now = _now()
     with _conn() as c:
         c.execute(
-            "INSERT INTO messages(id,conversation_id,role,content,images,reasoning,model,created_at)"
-            " VALUES(?,?,?,?,?,?,?,?)",
-            (mid, cid, role, content, json.dumps(images or []), reasoning, model, now),
+            "INSERT INTO messages(id,conversation_id,role,content,images,reasoning,"
+            "model,tools,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (mid, cid, role, content, json.dumps(images or []), reasoning, model,
+             json.dumps(tools or []), now),
         )
         c.execute("UPDATE conversations SET updated_at=? WHERE id=?", (now, cid))
         # 首条用户消息作为标题
@@ -142,7 +148,8 @@ def add_message(cid: str, role: str, content: str, images: list | None = None,
         if row and row["title"] == "新会话" and role == "user" and content.strip():
             c.execute("UPDATE conversations SET title=? WHERE id=?", (content.strip()[:30], cid))
     return {"id": mid, "role": role, "content": content, "images": images or [],
-            "reasoning": reasoning, "model": model, "created_at": now}
+            "reasoning": reasoning, "model": model, "tools": tools or [],
+            "created_at": now}
 
 
 # ---------------- 生成任务 ----------------
