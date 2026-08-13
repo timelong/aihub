@@ -21,7 +21,8 @@ cp .env.example .env      # 填入你有的 API Key（不需要全填）
 ./run.sh                  # 自动建 venv、装依赖、启动
 ```
 
-打开 <http://127.0.0.1:8000>
+服务起来后会自动打开浏览器（不想自动打开就用 `NO_OPEN=1 ./run.sh`），
+也可以手动访问 <http://127.0.0.1:8000>
 
 手动方式：
 
@@ -129,6 +130,18 @@ BOCHA_API_KEY=       # 博查，国内直连
 
 **🎨 图片生成**
 - 提示词 / 负向提示词 / 尺寸 / 数量 / 种子
+- **尺寸按模型走**：各家推荐分辨率差别很大（Qwen-Image 是 1328 系列、即梦用 2K/4K、
+  DALL·E 3 只认三种），所以在 `config.yaml` 给出图模型写 `sizes`，界面「尺寸」下拉只列
+  这些并自动标出比例，第一个为默认值；没配 `sizes` 的模型用通用列表。
+  请求的尺寸不在列表里时不拦截，但会在日志里留一条 WARNING。
+
+```yaml
+      image:
+        - id: Qwen/Qwen-Image-2512
+          name: Qwen-Image 文生图
+          sizes: [1328x1328, 1664x928, 928x1664, 1472x1104, 1104x1472, 1584x1056, 1056x1584]
+```
+
 - **图生图 / 图片编辑**：上传参考图（可多张）即从文生图切到图生图。
   已支持：OpenAI 兼容接口（`/images/edits`）、火山方舟即梦 Seedream、
   Gemini Flash Image、魔搭；阿里百炼与智谱的图生图要求公网图片 URL，
@@ -137,6 +150,14 @@ BOCHA_API_KEY=       # 博查，国内直连
   个别兼容服务（如硅基流动）的图生图是在 `/images/generations` 传 `image` 字段，
   给该 provider 加 `image_edit_mode: json` 即可
 - 结果自动下载到本地（第三方图床链接通常 24h 过期，本地留存不怕丢）
+- **生成完有明确反馈**：绿色提示「✅ 生成成功：N 张，用时 Ns，已保存到 …」；
+  结果卡片显示缩略图（点开原图）、状态与用时、模型与尺寸、生成时间、
+  **本地绝对路径 + 一键复制**；失败则显示完整错误原文
+- 生成按钮上有已等待秒数；服务被重启后遗留的「生成中」任务会在下次启动时标为失败，
+  不会一直转圈
+- **列表可清理**：卡片右上角 ✕ 移除单条，或点「清空列表」。规则是**磁盘文件一律不删**：
+  - 有结果的（生成成功）→ 只从页面隐藏，记录和图片都保留，勾选「显示已隐藏」可找回并 ↩ 恢复
+  - 没有结果的（失败、卡住）→ 记录真正删除
 - **保存目录可配置**：见下方「保存目录」一节
 
 **📁 保存目录（可配置）**
@@ -157,19 +178,47 @@ storage:
 - 时长 / 比例 / 分辨率
 - 异步任务：提交后后台轮询，界面每 5 秒自动刷新状态
 
-**📜 运行日志**
-- 控制台 + 文件双写，默认落在 `data/logs/aihub.log`，10MB 滚动保留 5 份
+**📜 运行日志 / 🗂 日志管理**
+- 控制台 + 文件双写，**按天滚动**：当天写 `data/logs/aihub.log`，
+  跨天自动改名成 `aihub-2026-08-12.log`
 - 记录内容：每个接口的方法/路径/状态码/耗时、上游 API 的请求与响应（含状态码和耗时）、
   对话的模型与工具调用轨迹、出图/视频任务的开始与结果、异常堆栈
+- **每行自动带上下文** `{job=... model=...}` / `{conv=... model=...}`：
+  provider 层那些 `GET /v1/tasks/xxx` 也能看出是哪个任务、哪个模型在跑
+- **轮询汇总成一行**：`轮询 #12 状态=RUNNING 已等 36s task=xxx`，
+  原始的 →/← 请求行降到 DEBUG，不再刷屏
+- 出图/出视频成功时记录**绝对路径和文件大小**，可以直接去文件夹里找
 - 密钥会被自动打码，base64 图片会被压成 `<data:image/png base64 12345B>`，不会把日志刷爆
-- 在「⚙️ 模型配置 → 📜 运行日志」可以直接看最近 400 行，支持自动刷新
+- 左侧「🗂 日志管理」页可以：
+  - 设置**历史日志保留天数**（写进 `config.yaml` 的 `logging.retention_days`，
+    0 = 永久保留），服务启动时与改配置时都会清理超期文件，也可点「立即清理过期日志」
+  - 按文件查看（当天 / 各历史日期），单独删除某个历史文件（当天的正在写，不允许删）
+  - **搜索**：关键词（空格分隔=都要包含，不区分大小写，命中处高亮）+ 级别过滤
+    （INFO/WARNING/ERROR 及以上）+ 显示行数，右上角可开自动刷新
 - 环境变量：
+
+```yaml
+logging:
+  retention_days: 7     # 历史日志保留天数，0 = 永久保留
+```
 
 ```dotenv
 AIHUB_LOG_DIR=          # 日志目录，默认 data/logs
 AIHUB_LOG_LEVEL=INFO    # 设 DEBUG 会额外记录请求体/响应体预览
 AIHUB_LOG_BODY=800      # 请求/响应预览截断长度
 ```
+
+- 每行都带**时区偏移和进程号**：`2026-08-13 10:25:48+0800 INFO [aihub:57181] ...`。
+  多个实例同时在跑会写进同一个文件，靠 pid 就能把两条时间线分开
+
+**🛑 服务突然停止怎么判断**
+- 日志出现 `服务开始关闭 PID=xxx` + `Application shutdown complete`，且没有 traceback
+  → 是**收到外部信号**（Ctrl-C / `kill` / `pkill` / 关掉终端），不是程序崩溃
+- run.sh 会在退出时区分并打印原因：`⚠ 服务被 SIGTERM 终止` / `▶ 服务已停止` /
+  `⚠ 服务异常退出，退出码 N`
+- 启动时会打印 `▶ 服务进程 PID: xxxxx`，**要停就按这个 pid 停**。
+  别用 `pkill -f uvicorn` 这种模式匹配——机器上有多个实例时会把别人的一起杀掉
+- 真崩溃的话日志里一定有 `Traceback` 或 `未处理异常`，按那个查
 
 ---
 
@@ -183,6 +232,7 @@ aihub/
 │   ├── logging_setup.py     # 日志：控制台 + data/logs/aihub.log 滚动文件、密钥打码
 │   ├── tools.py             # 对话工具：联网搜索（Tavily/博查/Bing）、网页抓取
 │   ├── context.py           # 运行时上下文注入：当前时间/时区
+│   ├── logctx.py            # 日志上下文：让底层日志也带 job/conv/model
 │   ├── storage.py           # SQLite：会话、消息、生成任务
 │   └── providers/
 │       ├── base.py          # 抽象基类 chat_stream / generate_image / submit_video / poll_video
@@ -229,13 +279,20 @@ class MyProvider(BaseProvider):
 | GET·PUT | `/api/defaults` | 读取 / 设置各能力的默认模型 |
 | GET | `/api/tools` | 可用工具清单（含当前搜索后端） |
 | GET | `/api/context` | 当前会注入给模型的时间上下文 |
-| GET | `/api/logs?lines=` | 回看最近若干行运行日志 |
+| GET | `/api/logs?file=&q=&level=&lines=` | 查看 / 搜索日志 |
+| GET | `/api/logs/files` | 日志文件清单 + 当前保留天数 |
+| PUT | `/api/logs/config` | 设置保留天数（并立即清理） |
+| POST | `/api/logs/cleanup` | 立即清理过期日志 |
+| DELETE | `/api/logs/{name}` | 删除某个历史日志文件 |
 | GET | `/api/fs?path=` | 浏览服务器目录（目录选择器用） |
 | POST | `/api/fs/mkdir` | 新建文件夹 |
 | POST | `/api/chat` | 流式对话（SSE） |
 | POST | `/api/image` | 同步出图 |
 | POST | `/api/video` | 提交视频任务 |
-| GET | `/api/jobs?kind=` | 任务列表 |
+| GET | `/api/jobs?kind=&include_hidden=` | 任务列表 |
+| DELETE | `/api/jobs/{id}` | 移除记录（有结果的只隐藏，不删文件） |
+| POST | `/api/jobs/{id}/restore` | 恢复被隐藏的记录 |
+| POST | `/api/jobs/clear?kind=` | 清空列表（同上规则） |
 | GET | `/api/jobs/{id}` | 单个任务状态 |
 | GET·POST | `/api/conversations` | 会话列表 / 新建 |
 | GET·DELETE | `/api/conversations/{id}` | 会话详情 / 删除 |

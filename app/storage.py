@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     prompt TEXT,
     params TEXT DEFAULT '{}',
     status TEXT DEFAULT 'pending', -- pending | running | succeeded | failed
+    hidden INTEGER DEFAULT 0,      -- 1 = 页面上不显示（记录和磁盘文件都保留）
     remote_id TEXT,
     result TEXT DEFAULT '[]',      -- 结果 URL 列表
     error TEXT DEFAULT '',
@@ -64,6 +65,9 @@ def init() -> None:
         cols = {r["name"] for r in c.execute("PRAGMA table_info(messages)")}
         if "tools" not in cols:  # 老库补上工具调用轨迹字段
             c.execute("ALTER TABLE messages ADD COLUMN tools TEXT DEFAULT '[]'")
+        jcols = {r["name"] for r in c.execute("PRAGMA table_info(jobs)")}
+        if "hidden" not in jcols:  # 从页面隐藏（记录与磁盘文件都保留）
+            c.execute("ALTER TABLE jobs ADD COLUMN hidden INTEGER DEFAULT 0")
 
 
 def _now() -> float:
@@ -185,13 +189,76 @@ def get_job(jid: str) -> dict | None:
     return j
 
 
-def list_jobs(kind: str | None = None, limit: int = 50) -> list[dict]:
+def sweep_stale_jobs(max_age_seconds: float = 45 * 60) -> list[str]:
+    """把上次进程留下的「生成中」任务标成失败。
+
+    服务被杀掉后，进行中的任务没人再更新它，界面上会永远转圈。这里只处理
+    明显过期的（默认 45 分钟，比视频轮询上限 30 分钟还宽），避免误伤另一个
+    正在同时运行的实例。
+    """
+    cutoff = _now() - max_age_seconds
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT id FROM jobs WHERE status IN ('running','pending') AND updated_at < ?",
+            (cutoff,),
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        if ids:
+            c.execute(
+                f"UPDATE jobs SET status='failed', error=?, updated_at=? "
+                f"WHERE id IN ({','.join('?' * len(ids))})",
+                ("状态未知：服务在任务进行中被重启或终止", _now(), *ids),
+            )
+    return ids
+
+
+def hide_job(jid: str, hidden: bool = True) -> None:
+    """只改显示状态，绝不动记录和磁盘文件。"""
+    with _conn() as c:
+        c.execute("UPDATE jobs SET hidden=? WHERE id=?", (1 if hidden else 0, jid))
+
+
+def delete_job(jid: str) -> None:
+    """删除任务记录本身（调用方要先确认这条没有已保存的结果文件）。"""
+    with _conn() as c:
+        c.execute("DELETE FROM jobs WHERE id=?", (jid,))
+
+
+def clear_jobs(kind: str | None = None) -> dict[str, list[str]]:
+    """清空列表：成功的只隐藏（保留记录与图片），其余直接删记录。"""
+    hidden: list[str] = []
+    deleted: list[str] = []
+    with _conn() as c:
+        q = "SELECT id,status,result FROM jobs WHERE hidden=0"
+        args: tuple = ()
+        if kind:
+            q += " AND kind=?"
+            args = (kind,)
+        for r in c.execute(q, args).fetchall():
+            has_files = bool(json.loads(r["result"] or "[]"))
+            if r["status"] == "succeeded" or has_files:
+                c.execute("UPDATE jobs SET hidden=1 WHERE id=?", (r["id"],))
+                hidden.append(r["id"])
+            else:
+                c.execute("DELETE FROM jobs WHERE id=?", (r["id"],))
+                deleted.append(r["id"])
+    return {"hidden": hidden, "deleted": deleted}
+
+
+def list_jobs(kind: str | None = None, limit: int = 50,
+              include_hidden: bool = False) -> list[dict]:
     q = "SELECT * FROM jobs"
-    args: tuple = ()
+    conds: list[str] = []
+    args: list = []
     if kind:
-        q += " WHERE kind=?"
-        args = (kind,)
+        conds.append("kind=?")
+        args.append(kind)
+    if not include_hidden:
+        conds.append("COALESCE(hidden,0)=0")
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
     q += " ORDER BY created_at DESC LIMIT ?"
+    args = tuple(args)
     with _conn() as c:
         rows = c.execute(q, (*args, limit)).fetchall()
     out = []

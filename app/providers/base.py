@@ -58,7 +58,9 @@ class BaseProvider:
                 body = " body=" + preview(request.content)
             except Exception:  # noqa: BLE001  # 流式/multipart 请求读不到内容
                 body = ""
-        log.info("→ [%s] %s %s%s", self.id, request.method, request.url, body)
+        # 轮询会重复几十次，只在 DEBUG 下打原始行；进度由 poll_progress() 汇总
+        lvl = logging.DEBUG if request.extensions.get("aihub_poll") else logging.INFO
+        log.log(lvl, "→ [%s] %s %s%s", self.id, request.method, request.url, body)
 
     async def _on_response(self, response: httpx.Response) -> None:
         t0 = response.request.extensions.get("aihub_t0")
@@ -71,9 +73,22 @@ class BaseProvider:
                 detail = " " + preview(response.text)
             except Exception:  # noqa: BLE001
                 detail = ""
-        lvl = logging.ERROR if response.status_code >= 400 else logging.INFO
+        if response.status_code >= 400:
+            lvl = logging.ERROR
+        elif response.request.extensions.get("aihub_poll"):
+            lvl = logging.DEBUG   # 轮询太密，进度用 poll_progress() 汇总成一行
+        else:
+            lvl = logging.INFO
         log.log(lvl, "← [%s] %s %s %s%s", self.id, response.status_code,
                 response.request.url.path, ms, detail)
+
+    POLL = {"aihub_poll": True}   # 传给 httpx 的 extensions，标记这是轮询请求
+
+    def poll_progress(self, attempt: int, status: str, waited: float,
+                      task_id: str = "") -> None:
+        """轮询进度：每次一行，能看出等了多久、上游是什么状态。"""
+        log.info("[%s] 轮询 #%d 状态=%s 已等 %.0fs%s", self.id, attempt,
+                 status or "?", waited, f" task={task_id}" if task_id else "")
 
     def require_key(self) -> None:
         if not self.api_key:

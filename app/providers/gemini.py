@@ -149,7 +149,8 @@ class GeminiProvider(BaseProvider):
     async def poll_video(self, model: str, remote_id: str) -> dict:
         url = f"{self.base_url}/{remote_id}"
         async with self.client() as cli:
-            data = self.check(await cli.get(url, headers=self._headers()))
+            data = self.check(await cli.get(url, headers=self._headers(),
+                                            extensions=self.POLL))
         if not data.get("done"):
             return {"status": "running", "urls": []}
         if data.get("error"):

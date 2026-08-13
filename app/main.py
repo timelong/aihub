@@ -6,6 +6,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -18,11 +19,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import context as ctx
+from . import logctx
 from . import providers, storage
 from . import tools as toolkit
-from .config import (MEDIA_DIR, ROOT, defaults_raw, load_config, raw_config_text,
-                     resolve_dir, save_config, set_defaults, set_storage_dirs,
-                     storage_dirs, storage_raw)
+from . import logging_setup as logs
+from .config import (MEDIA_DIR, ROOT, defaults_raw, find_model_meta, load_config,
+                     patch_section, raw_config_text, resolve_dir, save_config,
+                     set_defaults, set_storage_dirs, storage_dirs, storage_raw)
 from .logging_setup import preview, setup as setup_logging
 from .providers.base import ProviderError, is_data_url, ref_images, split_data_url
 
@@ -33,7 +36,18 @@ app = FastAPI(title="AI Hub", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
                    allow_headers=["*"])
 storage.init()
-log.info("AI Hub 启动，日志文件: %s", LOG_FILE)
+log.info("AI Hub 启动 PID=%s 时区=%s 日志文件=%s",
+         os.getpid(), time.strftime("%Z %z"), LOG_FILE)
+_stale = storage.sweep_stale_jobs()
+if _stale:
+    log.warning("发现 %d 个上次残留的「生成中」任务，已标为失败: %s", len(_stale), _stale)
+
+
+@app.on_event("shutdown")
+def _on_shutdown() -> None:
+    # 正常退出与被 kill/pkill 都会走到这里；写清 PID，便于和同时在跑的其它实例区分。
+    log.warning("服务开始关闭 PID=%s。若你没有主动停止，通常是收到了外部信号"
+                "（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。", os.getpid())
 
 
 @app.middleware("http")
@@ -56,15 +70,94 @@ async def access_log(request: Request, call_next):
 
 
 @app.get("/api/logs")
-def api_logs(lines: int = 200) -> dict:
-    """回看最近的日志，方便在界面上排查。"""
-    n = max(1, min(int(lines or 200), 2000))
+def api_logs(lines: int = 200, file: str | None = None, q: str = "",
+             level: str = "") -> dict:
+    """回看 / 搜索日志。
+
+    file  留空看当天的 aihub.log，也可传 aihub-2026-08-12.log 看历史
+    q     关键词，空格分隔表示「都要包含」，不区分大小写
+    level 只看某个级别及以上：ERROR / WARNING / INFO / DEBUG
+    """
+    n = max(1, min(int(lines or 200), 5000))
     try:
-        content = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+        path = logs.resolve_file(file)
+    except FileNotFoundError:
+        raise HTTPException(404, f"日志文件不存在: {file}")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")
     except FileNotFoundError:
         content = ""
-    tail = content.splitlines()[-n:]
-    return {"path": str(LOG_FILE), "lines": tail}
+
+    all_lines = content.splitlines()
+    kept = all_lines
+    if level:
+        wanted = LEVEL_ORDER.get(level.upper())
+        if wanted is None:
+            raise HTTPException(400, f"未知日志级别: {level}")
+        kept = [l for l in kept if _line_level(l) >= wanted]
+    for kw in q.split():
+        low = kw.lower()
+        kept = [l for l in kept if low in l.lower()]
+
+    return {"path": str(path), "file": path.name, "total": len(all_lines),
+            "matched": len(kept), "lines": kept[-n:]}
+
+
+LEVEL_ORDER = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
+_LEVEL_RE = re.compile(r"^\S+ \S+ (DEBUG|INFO|WARNING|ERROR|CRITICAL)\b")
+
+
+def _line_level(line: str) -> int:
+    """从日志行里取级别；取不到（比如 traceback 续行）当成最高级别，避免被过滤掉。"""
+    m = _LEVEL_RE.match(line)
+    return LEVEL_ORDER[m.group(1)] if m else 50
+
+
+@app.get("/api/logs/files")
+def api_log_files() -> dict:
+    keep = logs.retention_days()
+    return {"dir": str(logs.log_dir()), "retention_days": keep,
+            "items": logs.list_files()}
+
+
+class LogConfReq(BaseModel):
+    retention_days: int
+
+
+@app.put("/api/logs/config")
+def api_log_config(req: LogConfReq) -> dict:
+    days = int(req.retention_days)
+    if days < 0 or days > 3650:
+        raise HTTPException(400, "保留天数需在 0–3650 之间（0 表示永久保留）")
+    patch_section("logging", {"retention_days": str(days)})
+    removed = logs.cleanup()
+    log.info("日志保留天数改为 %s，顺带清理了 %d 个文件", days, len(removed))
+    return {"retention_days": logs.retention_days(), "removed": removed}
+
+
+@app.post("/api/logs/cleanup")
+def api_log_cleanup() -> dict:
+    removed = logs.cleanup()
+    log.info("手动清理过期日志，删除 %d 个: %s", len(removed), removed or "无")
+    return {"removed": removed, "items": logs.list_files()}
+
+
+@app.delete("/api/logs/{name}")
+def api_log_delete(name: str) -> dict:
+    """删除某个历史日志文件（当天的不允许删，它正在被写）。"""
+    if name == "aihub.log":
+        raise HTTPException(400, "当天日志正在写入，不能删除")
+    try:
+        path = logs.resolve_file(name)
+    except FileNotFoundError:
+        raise HTTPException(404, "文件不存在")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    path.unlink()
+    log.info("删除历史日志 %s", name)
+    return {"items": logs.list_files()}
 
 
 # ============================ 数据模型 ============================
@@ -306,11 +399,15 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
     params["system_prompt"] = req.system_prompt
     params["tools"] = [t for t in req.tools if t in toolkit.SPECS]
 
-    log.info("对话开始 conv=%s model=%s 历史=%d条 图片=%d张 工具=%s 参数=%s",
-             cid, req.model, len(msgs), len(req.images),
-             params["tools"] or "无", preview(req.params))
+    meta = find_model_meta(prov.id, model_id, "chat")
+    with logctx.bind(conv=cid, model=req.model):
+        log.info("对话开始 模型=%s(%s) 历史=%d条 图片=%d张 工具=%s 系统提示词=%d字 参数=%s",
+                 meta.get("name") or model_id, model_id, len(msgs), len(req.images),
+                 params["tools"] or "无", len(req.system_prompt or ""),
+                 preview({k: v for k, v in req.params.items() if k != "tools"}))
 
     async def gen():
+        logctx.set_ctx(conv=cid, model=req.model)
         yield _sse({"type": "start", "conversation_id": cid, "model": req.model})
         buf, think, trace = [], [], []
         t0 = time.perf_counter()
@@ -321,22 +418,21 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
                 elif ev["type"] == "reasoning":
                     think.append(ev["text"])
                 elif ev["type"] == "tool_call":
-                    log.info("对话 conv=%s 调用工具 %s args=%s", cid, ev["name"],
-                             preview(ev.get("args")))
+                    log.info("调用工具 %s args=%s", ev["name"], preview(ev.get("args")))
                 elif ev["type"] == "tool_result":
-                    log.info("对话 conv=%s 工具结果 %s", cid, preview(ev.get("summary")))
+                    log.info("工具结果 %s", preview(ev.get("summary")))
                     trace.append(f"{ev['name']}: {ev.get('summary', '')}")
                 yield _sse(ev)
         except ProviderError as e:
-            log.error("对话失败 conv=%s model=%s: %s", cid, req.model, e)
+            log.error("对话失败 用时%.1fs: %s", time.perf_counter() - t0, e)
             yield _sse({"type": "error", "message": str(e)})
         except Exception as e:  # noqa: BLE001
-            log.exception("对话异常 conv=%s model=%s", cid, req.model)
+            log.exception("对话异常 用时%.1fs", time.perf_counter() - t0)
             yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
         else:
             text = "".join(buf)
-            log.info("对话完成 conv=%s model=%s 输出%d字 思考%d字 工具%d次 用时%.1fs",
-                     cid, req.model, len(text), len("".join(think)), len(trace),
+            log.info("对话完成 输出%d字 思考%d字 工具%d次 用时%.1fs",
+                     len(text), len("".join(think)), len(trace),
                      time.perf_counter() - t0)
             if req.save and cid:
                 storage.add_message(cid, "assistant", text, reasoning="".join(think),
@@ -356,24 +452,44 @@ async def api_image(req: ImageReq) -> dict:
     except Exception as e:
         raise HTTPException(400, str(e))
     refs = ref_images(req.params)
+    meta = find_model_meta(prov.id, model_id, "image")
+    allowed = [str(s) for s in (meta.get("sizes") or [])]
+    size = str(req.params.get("size") or "")
     job = storage.create_job("image", prov.id, model_id, req.prompt, req.params)
     storage.update_job(job["id"], status="running")
-    log.info("出图开始 job=%s model=%s 参考图%d张 prompt=%s 参数=%s",
-             job["id"], req.model, len(refs), preview(req.prompt, 200),
-             preview({k: v for k, v in req.params.items()
-                      if k not in ("images", "image_url")}))
-    t0 = time.perf_counter()
-    try:
-        urls = await prov.generate_image(model_id, req.prompt, req.params)
-    except Exception as e:  # noqa: BLE001
-        log.error("出图失败 job=%s model=%s: %s", job["id"], req.model, e)
-        storage.update_job(job["id"], status="failed", error=str(e))
-        raise HTTPException(502, str(e))
-    local = [await _persist(u, "png", "image") for u in urls]
-    log.info("出图成功 job=%s 用时%.1fs 结果=%s", job["id"],
-             time.perf_counter() - t0, local)
-    storage.update_job(job["id"], status="succeeded", result=local)
+
+    with logctx.bind(job=job["id"], model=req.model):
+        if allowed and size and size not in allowed:
+            log.warning("出图尺寸 %s 不在该模型支持列表 %s 内，仍按请求发出", size, allowed)
+        log.info("出图开始 模型=%s(%s) 尺寸=%s 数量=%s 参考图%d张 prompt=%s 其它参数=%s",
+                 meta.get("name") or model_id, model_id, size or "默认",
+                 req.params.get("n", 1), len(refs), preview(req.prompt, 300),
+                 preview({k: v for k, v in req.params.items()
+                          if k not in ("images", "image_url", "size", "n")}))
+        t0 = time.perf_counter()
+        try:
+            urls = await prov.generate_image(model_id, req.prompt, req.params)
+        except Exception as e:  # noqa: BLE001
+            log.error("出图失败 用时%.1fs: %s", time.perf_counter() - t0, e)
+            storage.update_job(job["id"], status="failed", error=str(e))
+            raise HTTPException(502, str(e))
+        log.info("上游返回 %d 张，开始落盘", len(urls))
+        local = [await _persist(u, "png", "image") for u in urls]
+        log.info("出图成功 用时%.1fs 共%d张 %s", time.perf_counter() - t0, len(local),
+                 "; ".join(_describe(u, "image") for u in local))
+        storage.update_job(job["id"], status="succeeded", result=local)
     return storage.get_job(job["id"])
+
+
+def _describe(url: str, kind: str) -> str:
+    """把 /media/image/x.png 描述成 '绝对路径 (123.4 KB)'，方便直接去文件夹里找。"""
+    if not url.startswith("/media/"):
+        return url
+    path = storage_dirs()[kind] / url.rsplit("/", 1)[-1]
+    try:
+        return f"{path} ({path.stat().st_size / 1024:.1f} KB)"
+    except OSError:
+        return str(path)
 
 
 # ============================ 视频生成（异步任务）============================
@@ -383,49 +499,96 @@ async def api_video(req: VideoReq, bg: BackgroundTasks) -> dict:
         prov, model_id = providers.resolve(req.model)
     except Exception as e:
         raise HTTPException(400, str(e))
+    meta = find_model_meta(prov.id, model_id, "video")
     job = storage.create_job("video", prov.id, model_id, req.prompt, req.params)
-    log.info("视频提交 job=%s model=%s prompt=%s 参数=%s", job["id"], req.model,
-             preview(req.prompt, 200),
-             preview({k: v for k, v in req.params.items() if k != "image_url"}))
-    try:
-        remote = await prov.submit_video(model_id, req.prompt, req.params)
-    except Exception as e:  # noqa: BLE001
-        log.error("视频提交失败 job=%s: %s", job["id"], e)
-        storage.update_job(job["id"], status="failed", error=str(e))
-        raise HTTPException(502, str(e))
-    log.info("视频任务已受理 job=%s remote=%s", job["id"], remote)
-    storage.update_job(job["id"], status="running", remote_id=remote)
-    bg.add_task(_watch_video, job["id"], prov.id, model_id, remote)
+    with logctx.bind(job=job["id"], model=req.model):
+        log.info("视频提交 模型=%s(%s) 首帧图=%s prompt=%s 参数=%s",
+                 meta.get("name") or model_id, model_id,
+                 "有" if req.params.get("image_url") else "无", preview(req.prompt, 300),
+                 preview({k: v for k, v in req.params.items() if k != "image_url"}))
+        try:
+            remote = await prov.submit_video(model_id, req.prompt, req.params)
+        except Exception as e:  # noqa: BLE001
+            log.error("视频提交失败: %s", e)
+            storage.update_job(job["id"], status="failed", error=str(e))
+            raise HTTPException(502, str(e))
+        log.info("视频任务已受理 remote=%s，转后台轮询", remote)
+        storage.update_job(job["id"], status="running", remote_id=remote)
+    bg.add_task(_watch_video, job["id"], prov.id, model_id, remote, req.model)
     return storage.get_job(job["id"])
 
 
-async def _watch_video(jid: str, pid: str, model_id: str, remote: str) -> None:
+async def _watch_video(jid: str, pid: str, model_id: str, remote: str,
+                       ref: str = "") -> None:
+    logctx.set_ctx(job=jid, model=ref or f"{pid}/{model_id}")
     prov = providers.build(pid)
-    deadline = time.time() + 60 * 30
+    t0 = time.time()
+    deadline = t0 + 60 * 30
+    attempt = 0
     while time.time() < deadline:
         await asyncio.sleep(6)
+        attempt += 1
         try:
             st = await prov.poll_video(model_id, remote)
         except Exception as e:  # noqa: BLE001
-            log.error("视频轮询异常 job=%s: %s", jid, e)
+            log.error("视频轮询异常（第 %d 次，已等 %.0fs）: %s", attempt, time.time() - t0, e)
             storage.update_job(jid, status="failed", error=str(e))
             return
+        prov.poll_progress(attempt, st["status"], time.time() - t0, remote)
         if st["status"] == "succeeded":
             local = [await _persist(u, "mp4", "video") for u in st.get("urls", [])]
-            log.info("视频完成 job=%s 结果=%s", jid, local)
+            log.info("视频完成 用时%.0fs 共%d个 %s", time.time() - t0, len(local),
+                     "; ".join(_describe(u, "video") for u in local))
             storage.update_job(jid, status="succeeded", result=local)
             return
         if st["status"] == "failed":
-            log.error("视频失败 job=%s: %s", jid, st.get("error", ""))
+            log.error("视频失败 用时%.0fs: %s", time.time() - t0, st.get("error", ""))
             storage.update_job(jid, status="failed", error=st.get("error", ""))
             return
-    log.error("视频轮询超时 job=%s", jid)
+    log.error("视频轮询超时（30 分钟，共轮询 %d 次）", attempt)
     storage.update_job(jid, status="failed", error="轮询超时（30 分钟）")
 
 
 @app.get("/api/jobs")
-def api_jobs(kind: str | None = None) -> dict:
-    return {"items": storage.list_jobs(kind)}
+def api_jobs(kind: str | None = None, include_hidden: bool = False) -> dict:
+    return {"items": storage.list_jobs(kind, include_hidden=include_hidden)}
+
+
+@app.delete("/api/jobs/{jid}")
+def api_job_delete(jid: str) -> dict:
+    """从列表移除一条记录。
+
+    有结果文件的（生成成功的）只标记隐藏——记录保留、磁盘上的图片/视频一律不删；
+    没有结果的（失败、卡住的）才真正删掉这条记录。
+    """
+    j = storage.get_job(jid)
+    if not j:
+        raise HTTPException(404, "任务不存在")
+    if j["status"] == "succeeded" or j.get("result"):
+        storage.hide_job(jid, True)
+        log.info("任务 %s 已从页面隐藏（记录与 %d 个结果文件保留）", jid, len(j["result"]))
+        return {"action": "hidden", "id": jid, "files_kept": j["result"]}
+    storage.delete_job(jid)
+    log.info("任务 %s 记录已删除（状态=%s，无结果文件）", jid, j["status"])
+    return {"action": "deleted", "id": jid}
+
+
+@app.post("/api/jobs/{jid}/restore")
+def api_job_restore(jid: str) -> dict:
+    if not storage.get_job(jid):
+        raise HTTPException(404, "任务不存在")
+    storage.hide_job(jid, False)
+    log.info("任务 %s 恢复显示", jid)
+    return {"action": "restored", "id": jid}
+
+
+@app.post("/api/jobs/clear")
+def api_jobs_clear(kind: str | None = None) -> dict:
+    """清空列表：成功的隐藏（记录和文件都留着），失败/未完成的删记录。"""
+    r = storage.clear_jobs(kind)
+    log.info("清空 %s 列表：隐藏 %d 条（保留文件），删除 %d 条无结果记录",
+             kind or "全部", len(r["hidden"]), len(r["deleted"]))
+    return r
 
 
 @app.get("/api/jobs/{jid}")

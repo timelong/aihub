@@ -49,7 +49,8 @@ class ZhipuProvider(OpenAICompatProvider):
     async def poll_video(self, model: str, remote_id: str) -> dict:
         async with self.client() as cli:
             data = self.check(await cli.get(f"{self.base_url}/async-result/{remote_id}",
-                                            headers=self.headers()))
+                                            headers=self.headers(),
+                                            extensions=self.POLL))
         st = (data.get("task_status") or "").upper()
         if st == "SUCCESS":
             urls = [v.get("url") for v in data.get("video_result", []) if v.get("url")]

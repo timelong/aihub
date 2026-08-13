@@ -18,6 +18,8 @@
 # 模型可加的标记:
 #   vision: true       对话模型能看图
 #   image_input: true  出图/视频模型支持传参考图（图生图 / 图生视频）
+#   sizes: [...]       该出图模型支持/推荐的尺寸，界面「尺寸」下拉只列这些；
+#                      不写则用通用列表。写第一个为默认值。
 #
 # provider 级可选:
 #   image_edit_mode: json   OpenAI 兼容接口的图生图改走 /images/generations
@@ -42,8 +44,10 @@ providers:
         - id: gpt-image-1
           name: GPT Image 1
           image_input: true      # 支持传参考图做编辑（走 /images/edits）
+          sizes: [1024x1024, 1536x1024, 1024x1536]
         - id: dall-e-3
           name: DALL·E 3
+          sizes: [1024x1024, 1792x1024, 1024x1792]
       video: []
 
   - id: deepseek
@@ -75,6 +79,7 @@ providers:
       image:
         - id: Kwai-Kolors/Kolors
           name: Kolors 出图
+          sizes: [1024x1024, 1024x576, 576x1024, 768x1024, 1024x768, 960x1280, 720x1440, 720x1280]
       video: []
 
   - id: ollama
@@ -112,10 +117,14 @@ providers:
       image:
         - id: Qwen/Qwen-Image-2512
           name: Qwen-Image 文生图
+          sizes: [1328x1328, 1664x928, 928x1664, 1472x1104, 1104x1472, 1584x1056, 1056x1584]
         - id: Qwen/Qwen-Image-Edit-2511
           name: Qwen-Image 图生图
+          image_input: true
+          sizes: [1328x1328, 1664x928, 928x1664, 1472x1104, 1104x1472, 1584x1056, 1056x1584]
         - id: MAILAND/majicflus_v1
           name: majicFlus 写实
+          sizes: [1024x1024, 832x1216, 1216x832]
       video: []
 
   - id: gemini
@@ -134,6 +143,7 @@ providers:
       image:
         - id: imagen-4.0-generate-001
           name: Imagen 4
+          sizes: [1024x1024, 1408x768, 768x1408, 1280x896, 896x1280]
         - id: gemini-2.5-flash-image
           name: Gemini Flash Image (Nano Banana)
           image_input: true      # 支持传参考图做编辑
@@ -157,8 +167,10 @@ providers:
       image:
         - id: wan2.2-t2i-flash
           name: 万相 2.2 文生图 Flash
+          sizes: [1024x1024, 1440x810, 810x1440, 1280x960, 960x1280]
         - id: wanx2.1-t2i-turbo
           name: 万相 2.1 文生图 Turbo
+          sizes: [1024x1024, 1280x720, 720x1280, 1024x768, 768x1024]
       video:
         - id: wan2.2-t2v-plus
           name: 万相 2.2 文生视频
@@ -180,6 +192,7 @@ providers:
         - id: doubao-seedream-4-0-250828
           name: 即梦 Seedream 4.0
           image_input: true      # 支持单图/多图参考（组图）
+          sizes: [2K, 4K, 2048x2048, 2304x1728, 1728x2304, 2560x1440, 1440x2560]
       video:
         - id: doubao-seedance-1-0-pro-250528
           name: 即梦 Seedance 1.0 Pro
@@ -200,6 +213,7 @@ providers:
       image:
         - id: cogview-4
           name: CogView-4
+          sizes: [1024x1024, 1344x768, 768x1344, 1440x720, 720x1440]
       video:
         - id: cogvideox-3
           name: CogVideoX-3
@@ -227,6 +241,15 @@ chat:
   inject_datetime: true
   timezone: Asia/Shanghai
   extra: ""
+
+# ==========================================================
+# 日志
+# 当天日志写 data/logs/aihub.log，跨天自动改名 aihub-2026-08-12.log。
+# retention_days: 历史日志保留天数，启动时和改配置时会清理超期文件。
+#                 0 表示永久保留。也可在「🗂 日志管理」页里改。
+# ==========================================================
+logging:
+  retention_days: 7
 
 # 默认选中的模型
 defaults:

@@ -59,7 +59,7 @@ class ArkProvider(OpenAICompatProvider):
         async with self.client() as cli:
             data = self.check(await cli.get(
                 f"{self.base_url}/contents/generations/tasks/{remote_id}",
-                headers=self.headers()))
+                headers=self.headers(), extensions=self.POLL))
         st = (data.get("status") or "").lower()
         if st == "succeeded":
             url = (data.get("content") or {}).get("video_url")

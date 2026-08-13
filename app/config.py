@@ -97,7 +97,7 @@ def storage_raw() -> dict[str, str]:
     return {k: str(conf.get(k) or DEFAULT_DIRS[k]) for k in DEFAULT_DIRS}
 
 
-def _patch_section(section: str, updates: dict[str, str]) -> None:
+def patch_section(section: str, updates: dict[str, str]) -> None:
     """就地修改 config.yaml 里某个顶层段的键值（保留注释与排版）。"""
     sec_re = re.compile(rf"^{re.escape(section)}\s*:")
     key_re = re.compile(r"^(\s*)(" + "|".join(map(re.escape, updates)) + r")\s*:")
@@ -151,7 +151,7 @@ def set_storage_dirs(image_dir: str | None = None,
         d = resolve_dir(v)
         d.mkdir(parents=True, exist_ok=True)  # 提前校验可写
 
-    _patch_section("storage", updates)
+    patch_section("storage", updates)
     return storage_raw()
 
 
@@ -181,7 +181,7 @@ def set_defaults(**refs: str | None) -> dict[str, str]:
         updates[cap] = f'"{ref}"'
 
     if updates:
-        _patch_section("defaults", updates)
+        patch_section("defaults", updates)
     return defaults_raw()
 
 

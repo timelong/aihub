@@ -30,13 +30,17 @@ class DashScopeProvider(OpenAICompatProvider):
     async def _wait_task(self, task_id: str, want: str) -> dict:
         """轮询任务；want = image | video"""
         import asyncio
+        import time
         url = f"{self.base_url}/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        t0 = time.monotonic()
         async with self.client() as cli:
-            for _ in range(300):
-                data = self.check(await cli.get(url, headers=headers))
+            for i in range(1, 301):
+                data = self.check(await cli.get(url, headers=headers,
+                                                extensions=self.POLL))
                 out = data.get("output", {})
                 st = out.get("task_status")
+                self.poll_progress(i, st, time.monotonic() - t0, task_id)
                 if st == "SUCCEEDED":
                     if want == "image":
                         return {"urls": [r["url"] for r in out.get("results", []) if r.get("url")]}
@@ -98,7 +102,8 @@ class DashScopeProvider(OpenAICompatProvider):
         url = f"{self.base_url}/tasks/{remote_id}"
         async with self.client() as cli:
             data = self.check(await cli.get(
-                url, headers={"Authorization": f"Bearer {self.api_key}"}))
+                url, headers={"Authorization": f"Bearer {self.api_key}"},
+                extensions=self.POLL))
         out = data.get("output", {})
         st = out.get("task_status")
         if st == "SUCCEEDED":

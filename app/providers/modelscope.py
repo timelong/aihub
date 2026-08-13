@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 from .base import ProviderError, ref_images
@@ -66,16 +67,19 @@ class ModelScopeProvider(OpenAICompatProvider):
         url = f"{self.base_url}/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {self.api_key}",
                    "X-ModelScope-Task-Type": "image_generation"}
+        t0 = time.monotonic()
         async with self.client() as cli:
-            for _ in range(200):
-                data = self.check(await cli.get(url, headers=headers))
+            for i in range(1, 201):
+                data = self.check(await cli.get(url, headers=headers,
+                                                extensions=self.POLL))
                 st = (data.get("task_status") or data.get("status") or "").upper()
+                self.poll_progress(i, st, time.monotonic() - t0, task_id)
                 if st in ("SUCCEED", "SUCCEEDED", "SUCCESS"):
                     return self._extract(data)
                 if st in ("FAILED", "FAIL", "CANCELED"):
                     raise ProviderError(f"任务失败: {data.get('message') or data}")
                 await asyncio.sleep(3)
-        raise ProviderError("出图任务超时")
+        raise ProviderError(f"出图任务超时（等了 {time.monotonic() - t0:.0f}s）")
 
     @staticmethod
     def _extract(data: dict, strict: bool = True) -> list[str]:

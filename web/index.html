@@ -53,7 +53,7 @@
   .spacer{flex:1}
   .page{flex:1;overflow:auto;padding:20px;display:none}
   .page.on{display:block}
-  .row{display:flex;gap:20px;align-items:flex-start}
+  .row{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
   .col{flex:1;min-width:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
   .card h3{margin:0 0 12px;font-size:14px}
@@ -89,7 +89,7 @@
   .tbtn.on::before{content:"✓ "}
   #logBox{background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:10px;
           font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;
-          max-height:420px;overflow:auto;white-space:pre-wrap}
+          max-height:62vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
   .imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .imgs img{max-height:150px;border-radius:8px;border:1px solid var(--line)}
   .composer{border-top:1px solid var(--line);padding:14px 24px;background:var(--panel)}
@@ -108,6 +108,10 @@
   .item img,.item video{width:100%;display:block;background:#000}
   .item .meta{padding:9px 11px;font-size:12px;color:var(--dim)}
   .item .st{font-size:11px}
+  .jx{padding:0 6px;font-size:12px;line-height:18px;color:var(--dim);background:transparent;
+      border-color:transparent}
+  .item:hover .jx{border-color:var(--line)}
+  .jx:hover{color:var(--err);border-color:var(--err);background:var(--panel2)}
   .st.running{color:var(--warn)} .st.succeeded{color:var(--ok)} .st.failed{color:var(--err)}
   .toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--err);
          color:var(--fg);padding:11px 15px;border-radius:10px;max-width:420px;display:none;z-index:99;
@@ -128,6 +132,7 @@
       <div class="tab" data-page="image">🎨 图片生成</div>
       <div class="tab" data-page="video">🎬 视频生成</div>
       <div class="tab" data-page="settings">⚙️ 模型配置</div>
+      <div class="tab" data-page="logs">🗂 日志管理</div>
     </div>
     <div class="convs">
       <h4>会话历史 <button style="float:right;padding:1px 8px;font-size:12px" onclick="newConv()">+ 新建</button></h4>
@@ -210,10 +215,8 @@
           </div>
           <div class="col" style="max-width:280px">
             <div class="field"><label>尺寸</label>
-              <select id="imgSize">
-                <option>1024x1024</option><option>1280x720</option><option>720x1280</option>
-                <option>1024x768</option><option>768x1024</option><option>2K</option>
-              </select></div>
+              <select id="imgSize"></select>
+              <div class="hint" id="imgSizeHint" style="margin-top:4px"></div></div>
             <div class="field"><label>数量</label>
               <input type="number" id="imgN" value="1" min="1" max="4"></div>
             <div class="field"><label>随机种子（可选）</label>
@@ -221,6 +224,15 @@
             <button class="primary" id="imgBtn" style="width:100%" onclick="genImage()">生成图片</button>
           </div>
         </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:16px">
+        <b style="font-size:13px">生成记录</b>
+        <button onclick="clearJobs('image')">清空列表</button>
+        <label class="hint" style="display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="imgShowHidden" style="width:auto"
+                 onchange="loadJobs('image')"> 显示已隐藏
+        </label>
+        <span class="hint">删除只影响列表显示，磁盘上已保存的图片不会被删除</span>
       </div>
       <div class="grid" id="imgGrid"></div>
     </div>
@@ -249,6 +261,15 @@
             <div class="hint" style="margin-top:8px">视频为异步任务，通常需 1–5 分钟，页面会自动刷新状态。</div>
           </div>
         </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:16px">
+        <b style="font-size:13px">生成记录</b>
+        <button onclick="clearJobs('video')">清空列表</button>
+        <label class="hint" style="display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="vidShowHidden" style="width:auto"
+                 onchange="loadJobs('video')"> 显示已隐藏
+        </label>
+        <span class="hint">删除只影响列表显示，磁盘上已保存的视频不会被删除</span>
       </div>
       <div class="grid" id="vidGrid"></div>
     </div>
@@ -302,24 +323,75 @@
         <span class="hint" style="margin-left:10px">支持绝对路径、<code>~/</code> 开头或相对工程根目录的相对路径</span>
       </div>
 
-      <div class="card" style="margin-bottom:16px">
-        <h3>📜 运行日志
-          <span style="float:right;display:flex;gap:8px">
-            <label class="hint" style="display:flex;align-items:center;gap:4px">
-              <input type="checkbox" id="logAuto" style="width:auto"> 自动刷新
-            </label>
-            <button onclick="loadLogs()">刷新</button>
-          </span>
-        </h3>
-        <div class="hint" id="logPath" style="margin-bottom:8px"></div>
-        <div id="logBox">（点刷新加载）</div>
-      </div>
-
       <div class="card">
         <h3>config.yaml <button class="primary" style="float:right" onclick="saveCfg()">保存并重载</button></h3>
         <textarea id="cfgText" rows="26" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px"></textarea>
         <div class="hint" style="margin-top:8px">
           api_key 支持 <code>${ENV_NAME}</code> 形式从 .env 读取。修改后点击保存即时生效。
+        </div>
+      </div>
+    </div>
+    <!-- ============ 日志管理 ============ -->
+    <div class="page" id="logsPage">
+      <div class="card" style="margin-bottom:16px">
+        <h3>🗂 日志管理</h3>
+        <div class="row" style="align-items:flex-end">
+          <div class="col" style="max-width:260px">
+            <div class="field"><label>历史日志保留天数（0 = 永久保留）</label>
+              <div style="display:flex;gap:8px">
+                <input type="number" id="logKeep" min="0" max="3650">
+                <button class="primary" style="white-space:nowrap" onclick="saveLogKeep()">保存</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="field">
+              <button onclick="cleanupLogs()">立即清理过期日志</button>
+              <div class="hint" id="logDir" style="margin-top:6px;word-break:break-all"></div>
+            </div>
+          </div>
+        </div>
+        <div class="hint">当天日志写在 <code>aihub.log</code>，跨天自动改名成
+          <code>aihub-2026-08-12.log</code>；服务启动时会按保留天数清理历史文件。</div>
+      </div>
+
+      <div class="row">
+        <div class="col" style="max-width:280px">
+          <div class="card">
+            <h3>日志文件</h3>
+            <div id="logFiles"></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card">
+            <h3>内容
+              <span style="float:right;display:flex;gap:8px;align-items:center">
+                <label class="hint" style="display:flex;align-items:center;gap:4px">
+                  <input type="checkbox" id="logAuto" style="width:auto"> 自动刷新
+                </label>
+                <button onclick="loadLogs()">刷新</button>
+              </span>
+            </h3>
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+              <input id="logQ" style="min-width:220px;flex:1"
+                     placeholder="搜索关键词，空格分隔表示都要包含（如：出图 失败）"
+                     onkeydown="if(event.key==='Enter')loadLogs()">
+              <select id="logLevel" style="width:auto" onchange="loadLogs()">
+                <option value="">全部级别</option>
+                <option value="INFO">INFO 及以上</option>
+                <option value="WARNING">WARNING 及以上</option>
+                <option value="ERROR">只看 ERROR</option>
+              </select>
+              <select id="logLines" style="width:auto" onchange="loadLogs()">
+                <option value="200">最近 200 行</option>
+                <option value="500">最近 500 行</option>
+                <option value="2000">最近 2000 行</option>
+                <option value="5000">最近 5000 行</option>
+              </select>
+            </div>
+            <div class="hint" id="logMeta" style="margin-bottom:8px"></div>
+            <div id="logBox">（加载中…）</div>
+          </div>
         </div>
       </div>
     </div>
@@ -356,10 +428,19 @@
 const $ = s => document.querySelector(s);
 let CFG = {providers:[], defaults:{}}, convId = null, pending = [], ctrl = null;
 let TOOLS = [], activeTools = new Set(JSON.parse(localStorage.getItem('aihub_tools') || '[]'));
+let DIRS = {};      // 保存目录（含绝对路径），用于展示图片/视频落盘位置
 let imgRefs = [];   // 图生图参考图（data URL）
 
-function toast(msg, ms=6000){ const t=$('#toast'); t.textContent=msg; t.style.display='block';
-  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms); }
+function toast(msg, ms=6000, kind='err'){
+  const t=$('#toast'); t.textContent=msg; t.style.display='block';
+  t.style.borderColor = kind==='ok' ? 'var(--ok)' : 'var(--err)';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms);
+}
+const ok = (msg, ms=6000) => toast(msg, ms, 'ok');
+async function copyText(text, label='已复制'){
+  try{ await navigator.clipboard.writeText(text); ok(label+'：'+text, 4000); }
+  catch(e){ toast('复制失败，请手动选中：'+text, 8000); }
+}
 const esc = s => (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md(s){ // 极简 markdown：代码块 / 行内代码 / 粗体
   return esc(s)
@@ -379,7 +460,8 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   $('#chatParams').style.display = 'none';
   if(p==='image') loadJobs('image');
   if(p==='video') loadJobs('video');
-  if(p==='settings') loadLogs();
+  if(p==='logs'){ loadLogFiles(); loadLogs(); }
+  if(p!=='logs'){ clearInterval(logTimer); $('#logAuto').checked = false; }
 });
 const togglePanel = () => { const e=$('#chatParams'); e.style.display = e.style.display==='none'?'block':'none'; };
 
@@ -399,6 +481,7 @@ async function loadModels(){
         o.value = p.id+'/'+m.id; o.textContent = m.name || m.id;
         o.dataset.vision = m.vision?'1':'';
         o.dataset.imageInput = m.image_input?'1':'';
+        if(m.sizes && m.sizes.length) o.dataset.sizes = JSON.stringify(m.sizes);
         g.appendChild(o);
       });
       sel.appendChild(g);
@@ -407,6 +490,7 @@ async function loadModels(){
   fill($('#chatModel'),'chat'); fill($('#imgModel'),'image'); fill($('#vidModel'),'video');
   fill($('#defChat'),'chat',true); fill($('#defImage'),'image',true); fill($('#defVideo'),'video',true);
   applyDefaults();
+  fillSizes();
   const d = CFG.defaults||{};
   $('#defChat').value = d.chat||''; $('#defImage').value = d.image||'';
   $('#defVideo').value = d.video||'';
@@ -610,7 +694,30 @@ function renderRefs(){
   updImgHint();
 }
 function clearRefs(){ imgRefs = []; renderRefs(); }
-$('#imgModel').onchange = updImgHint;
+
+/* 尺寸下拉按所选模型走：模型配了 sizes 就只列它支持的，没配用通用列表 */
+const GENERIC_SIZES = ['1024x1024','1280x720','720x1280','1024x768','768x1024'];
+const COMMON_RATIOS = [[1,1],[16,9],[9,16],[4,3],[3,4],[3,2],[2,3],[21,9],[5,4],[4,5]];
+function ratioLabel(size){
+  const m = /^(\d+)\s*[x*×]\s*(\d+)$/i.exec(String(size).trim());
+  if(!m) return '';                                  // 2K / 4K 这类写法
+  const w = +m[1], h = +m[2], r = w/h;
+  const hit = COMMON_RATIOS.find(([a,b])=>Math.abs(r - a/b) < 0.02);
+  return hit ? `${hit[0]}:${hit[1]}` : r.toFixed(2)+':1';
+}
+function fillSizes(){
+  const o = $('#imgModel').selectedOptions[0];
+  const list = o && o.dataset.sizes ? JSON.parse(o.dataset.sizes) : GENERIC_SIZES;
+  const sel = $('#imgSize'), prev = sel.value;
+  sel.innerHTML = list.map(s=>{
+    const r = ratioLabel(s);
+    return `<option value="${esc(String(s))}">${esc(String(s))}${r?'　'+r:''}</option>`;
+  }).join('');
+  sel.value = list.map(String).includes(prev) ? prev : String(list[0]);  // 尽量保留原选择
+  $('#imgSizeHint').textContent = o && o.dataset.sizes
+    ? '该模型官方支持的尺寸' : '通用尺寸（该模型未在 config.yaml 里配 sizes）';
+}
+$('#imgModel').onchange = () => { fillSizes(); updImgHint(); };
 function updImgHint(){
   const o = $('#imgModel').selectedOptions[0];
   if(!imgRefs.length){ $('#imgRefHint').textContent =
@@ -627,14 +734,22 @@ async function genImage(){
   if($('#imgNeg').value.trim()) params.negative_prompt = $('#imgNeg').value.trim();
   if($('#imgSeed').value) params.seed = parseInt($('#imgSeed').value);
   if(imgRefs.length){ params.images = imgRefs; params.image_url = imgRefs[0]; }
-  const btn = $('#imgBtn'); btn.disabled=true; btn.textContent='生成中…';
+  const btn = $('#imgBtn'); btn.disabled=true;
+  const t0 = Date.now();
+  const tick = setInterval(()=>{ btn.textContent = `生成中… ${Math.round((Date.now()-t0)/1000)}s`; }, 500);
+  btn.textContent='生成中… 0s';
   try{
     const r = await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model, prompt, params})});
     if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const job = await r.json();
+    const secs = ((Date.now()-t0)/1000).toFixed(0);
+    const n = (job.result||[]).length;
+    if(n) ok(`✅ 生成成功：${n} 张，用时 ${secs}s，已保存到 ${DIRS.image_abs||'本地'}`, 8000);
+    else  toast('接口返回成功但没有图片，请看日志', 8000);
     await loadJobs('image');
-  }catch(e){ toast('出图失败：'+e.message); }
-  finally{ btn.disabled=false; btn.textContent='生成图片'; }
+  }catch(e){ toast('出图失败：'+e.message, 10000); }
+  finally{ clearInterval(tick); btn.disabled=false; btn.textContent='生成图片'; }
 }
 
 /* ---------- 视频生成 ---------- */
@@ -658,29 +773,87 @@ async function genVideo(){
     const r = await fetch('/api/video',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model, prompt, params})});
     if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
-    toast('任务已提交，正在生成…', 4000);
+    ok('任务已提交，正在后台生成，完成后会自动出现在下方列表', 6000);
     await loadJobs('video');
   }catch(e){ toast('提交失败：'+e.message); }
   finally{ btn.disabled=false; btn.textContent='生成视频'; }
 }
 
 /* ---------- 任务列表 ---------- */
+const fmtTime = ts => new Date(ts*1000).toLocaleString('zh-CN', {hour12:false});
+function absPath(url, kind){          // /media/image/x.png → 本地绝对路径
+  const base = kind==='image' ? DIRS.image_abs : DIRS.video_abs;
+  return base ? base + '/' + url.split('/').pop() : url;
+}
 async function loadJobs(kind){
-  const {items} = await (await fetch('/api/jobs?kind='+kind)).json();
+  const showHidden = $(kind==='image'?'#imgShowHidden':'#vidShowHidden').checked;
+  const {items} = await (await fetch(
+    `/api/jobs?kind=${kind}&include_hidden=${showHidden}`)).json();
   const grid = $('#'+(kind==='image'?'imgGrid':'vidGrid'));
   grid.innerHTML = items.map(j=>{
-    const media = (j.result||[]).map(u => kind==='image'
-      ? `<a href="${u}" target="_blank"><img src="${u}"></a>`
+    const files = j.result||[];
+    const media = files.map(u => kind==='image'
+      ? `<a href="${u}" target="_blank" title="点击在新标签打开原图"><img src="${u}"></a>`
       : `<video src="${u}" controls></video>`).join('');
-    return `<div class="item">${media}
+    const secs = j.updated_at && j.created_at
+      ? Math.round(j.updated_at - j.created_at) : null;
+    const st = j.status==='running' ? '<span class="spin"></span> 生成中…'
+             : j.status==='succeeded' ? `✅ 成功${files.length>1?`（${files.length} 张）`:''}`
+             : j.status==='failed' ? '❌ 失败' : '⏸ 等待中';
+    const paths = files.map(u=>{
+      const p = absPath(u, kind);
+      return `<div style="margin-top:4px;display:flex;gap:6px;align-items:center">
+        <code style="flex:1;word-break:break-all;font-size:11px">${esc(p)}</code>
+        <button style="padding:1px 7px;font-size:11px"
+                onclick="copyText('${p.replace(/'/g,"\\'")}','已复制路径')">复制</button>
+      </div>`;
+    }).join('');
+    const keeps = files.length > 0;   // 有结果文件 → 删除只是隐藏
+    const act = j.hidden
+      ? `<button class="jx" title="恢复显示" onclick="restoreJob('${j.id}','${kind}')">↩</button>`
+      : `<button class="jx" title="${keeps?'从列表移除（保留记录和本地文件）':'删除这条记录'}"
+                 onclick="delJob('${j.id}','${kind}',${keeps})">✕</button>`;
+    return `<div class="item" style="${j.hidden?'opacity:.55':''}">${media}
       <div class="meta">
-        <div class="st ${j.status}">${j.status==='running'?'⏳ 生成中…':j.status==='succeeded'?'✅ 完成':j.status==='failed'?'❌ 失败':'…'}</div>
-        <div style="margin-top:3px;color:var(--fg)">${esc((j.prompt||'').slice(0,60))}</div>
-        <div style="margin-top:3px">${esc(j.model)}</div>
-        ${j.error?`<div style="color:var(--err);margin-top:4px">${esc(j.error.slice(0,160))}</div>`:''}
+        <div class="st ${j.status}" style="display:flex;align-items:center;gap:6px">
+          <span style="flex:1">${st}${secs!==null&&j.status!=='running'?` · 用时 ${secs}s`:''}
+            ${j.hidden?'<span class="badge">已隐藏</span>':''}</span>${act}
+        </div>
+        <div style="margin-top:4px;color:var(--fg)">${esc(j.prompt||'')}</div>
+        <div style="margin-top:4px">${esc(j.model)}
+          ${j.params&&j.params.size?' · '+esc(String(j.params.size)):''}
+          ${(j.params&&(j.params.images||j.params.image_url))?' · 图生图':''}
+        </div>
+        <div style="margin-top:3px">${fmtTime(j.created_at)}</div>
+        ${paths}
+        ${j.error?`<div style="color:var(--err);margin-top:5px;word-break:break-all">${esc(j.error)}</div>`:''}
       </div></div>`;
   }).join('') || '<div class="hint">暂无生成记录</div>';
   if(items.some(j=>j.status==='running')) setTimeout(()=>loadJobs(kind), 5000);
+}
+
+async function delJob(id, kind, keepsFiles){
+  const msg = keepsFiles
+    ? '从列表移除这条记录？\n\n记录和磁盘上已保存的文件都会保留，只是页面不再显示（可勾选「显示已隐藏」找回）。'
+    : '删除这条记录？\n\n这条没有生成结果，记录会被真正删除。';
+  if(!confirm(msg)) return;
+  const r = await fetch('/api/jobs/'+id, {method:'DELETE'});
+  const d = await r.json();
+  if(!r.ok){ toast('操作失败：'+(d.detail||'')); return; }
+  await loadJobs(kind);
+  ok(d.action==='hidden' ? '已从列表移除，文件仍保留在磁盘上' : '记录已删除', 4000);
+}
+async function restoreJob(id, kind){
+  const r = await fetch(`/api/jobs/${id}/restore`, {method:'POST'});
+  if(!r.ok){ toast('恢复失败'); return; }
+  await loadJobs(kind); ok('已恢复显示', 3000);
+}
+async function clearJobs(kind){
+  if(!confirm('清空列表？\n\n生成成功的只会被隐藏（记录和磁盘文件都保留，可勾选「显示已隐藏」找回），'
+              + '失败或未完成的记录会被删除。')) return;
+  const d = await (await fetch('/api/jobs/clear?kind='+kind, {method:'POST'})).json();
+  await loadJobs(kind);
+  ok(`已隐藏 ${d.hidden.length} 条（文件保留），删除 ${d.deleted.length} 条无结果记录`, 5000);
 }
 
 /* ---------- 配置保存 ---------- */
@@ -691,20 +864,74 @@ async function saveCfg(){
   await loadModels(); await loadContext(); toast('配置已保存并重载 ✅', 3000);
 }
 
-/* ---------- 运行日志 ---------- */
-let logTimer = null;
+/* ---------- 日志管理 ---------- */
+let logTimer = null, logFile = '';   // logFile 为空表示当天的 aihub.log
+const kb = n => n < 1024 ? n+' B' : n < 1048576 ? (n/1024).toFixed(1)+' KB'
+                                                : (n/1048576).toFixed(1)+' MB';
+async function loadLogFiles(){
+  const d = await (await fetch('/api/logs/files')).json();
+  $('#logKeep').value = d.retention_days;
+  $('#logDir').textContent = '目录：' + d.dir;
+  $('#logFiles').innerHTML = (d.items||[]).map(f=>`
+    <div class="conv ${(logFile||'aihub.log')===f.name?'on':''}" onclick="pickLog('${f.name}')">
+      <span style="overflow:hidden;text-overflow:ellipsis">
+        ${f.current?'📄 今天':'🗓 '+esc(f.date)}
+        <span class="hint">${kb(f.size)}</span>
+      </span>
+      ${f.current?'':`<span class="x" title="删除"
+        onclick="event.stopPropagation();delLog('${f.name}')">✕</span>`}
+    </div>`).join('') || '<div class="hint" style="padding:6px">暂无日志文件</div>';
+}
+function pickLog(name){ logFile = name==='aihub.log' ? '' : name; loadLogFiles(); loadLogs(); }
+async function delLog(name){
+  const r = await fetch('/api/logs/'+encodeURIComponent(name), {method:'DELETE'});
+  if(!r.ok){ toast('删除失败：'+((await r.json()).detail||'')); return; }
+  if(logFile===name) logFile = '';
+  await loadLogFiles(); await loadLogs(); toast('已删除 '+name, 2500);
+}
 async function loadLogs(){
-  const d = await (await fetch('/api/logs?lines=400')).json();
-  $('#logPath').textContent = '日志文件：' + d.path;
+  const p = new URLSearchParams({lines:$('#logLines').value, q:$('#logQ').value,
+                                level:$('#logLevel').value});
+  if(logFile) p.set('file', logFile);
+  const r = await fetch('/api/logs?'+p);
+  const d = await r.json();
+  if(!r.ok){ toast('读取失败：'+(d.detail||'')); return; }
+  $('#logMeta').textContent =
+    `${d.file}　共 ${d.total} 行，匹配 ${d.matched} 行，显示 ${d.lines.length} 行`;
   const box = $('#logBox');
   const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
-  box.textContent = (d.lines||[]).join('\n') || '（暂无日志）';
+  const kws = $('#logQ').value.split(/\s+/).filter(Boolean);
+  box.innerHTML = (d.lines||[]).map(l=>{
+    let h = esc(l);
+    for(const k of kws)                       // 命中的关键词高亮
+      h = h.replace(new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),
+                    m=>`<mark style="background:#3b3f14;color:#fde68a">${m}</mark>`);
+    const color = /\bERROR\b|\bCRITICAL\b/.test(l) ? 'var(--err)'
+                : /\bWARNING\b/.test(l) ? 'var(--warn)' : '';
+    return color ? `<div style="color:${color}">${h}</div>` : `<div>${h}</div>`;
+  }).join('') || '<span class="hint">（没有匹配的日志）</span>';
   if(atBottom) box.scrollTop = box.scrollHeight;
 }
 $('#logAuto').onchange = e => {
   clearInterval(logTimer);
   if(e.target.checked){ loadLogs(); logTimer = setInterval(loadLogs, 3000); }
 };
+async function saveLogKeep(){
+  const r = await fetch('/api/logs/config',{method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({retention_days:parseInt($('#logKeep').value)||0})});
+  const d = await r.json();
+  if(!r.ok){ toast('保存失败：'+(d.detail||'')); return; }
+  await loadLogFiles(); $('#cfgText').value = (await (await fetch('/api/config')).json()).content;
+  toast(`保留天数已设为 ${d.retention_days || '永久'}` +
+        (d.removed.length?`，清理了 ${d.removed.length} 个文件`:''), 3000);
+}
+async function cleanupLogs(){
+  const d = await (await fetch('/api/logs/cleanup',{method:'POST'})).json();
+  await loadLogFiles(); await loadLogs();
+  toast(d.removed.length ? `已删除 ${d.removed.length} 个过期日志：${d.removed.join(', ')}`
+                         : '没有超过保留天数的日志', 3000);
+}
 
 /* ---------- 默认模型 ---------- */
 async function saveDefaults(){
@@ -722,6 +949,7 @@ async function saveDefaults(){
 /* ---------- 保存目录 ---------- */
 async function loadDirs(){
   const d = await (await fetch('/api/storage')).json();
+  DIRS = d;
   $('#imgDir').value = d.image_dir; $('#vidDir').value = d.video_dir;
   $('#imgDirAbs').textContent = '实际路径：' + d.image_abs;
   $('#vidDirAbs').textContent = '实际路径：' + d.video_abs;
