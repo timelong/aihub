@@ -166,6 +166,9 @@ BOCHA_API_KEY=       # 博查，国内直连
 - 删除时机：出图是请求结束就删；视频是异步任务，等后台轮询出结果（成功/失败/超时）才删，
   否则上游还没来取图就没了
 - 预签名有效期 `expire_seconds` 要覆盖生成耗时，默认 1800 秒（和视频轮询上限一致）
+- 对象 key = **前缀 / 时间戳 / 随机文件名**，例如
+  `aihub/tmp/20260813200539/0693553f….png`；`timestamp_format` 可改成
+  `%Y/%m/%d/%H%M%S` 按日期分层，或写 `epoch` 用 Unix 秒
 - 「⚙️ 模型配置 → ☁️ 腾讯云 COS」页显示配置状态，**「测试连接」**会真跑一遍
   上传 → 预签名 → 下载校验 → 删除，一次确认 4 个参数对不对
 - 密钥放 `.env`，其余放 `config.yaml`：
@@ -181,7 +184,8 @@ cos:
   secret_key: ${COS_SECRET_KEY}
   region: ap-guangzhou          # 存储桶地域
   bucket: my-bucket-1250000000  # 必须带 APPID
-  prefix: aihub/tmp/            # 临时对象 key 前缀
+  prefix: aihub/tmp/            # key 前缀；最终 key = 前缀/时间戳/文件名
+  timestamp_format: "%Y%m%d%H%M%S"  # 时间戳目录格式；写 epoch 则用 Unix 秒
   expire_seconds: 1800          # 预签名有效期(秒)
   scheme: https
   # enabled: false              # 显式关闭；不写则「配全了就自动启用」

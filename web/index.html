@@ -527,7 +527,8 @@ async function loadCos(){
   const rows = [
     ['地域 region', d.region], ['存储桶 bucket', d.bucket],
     ['SecretId', d.secret_id_masked], ['key 前缀', d.prefix],
-    ['预签名有效期', d.expire_seconds + ' 秒'], ['协议', d.scheme],
+    ['key 形如', d.key_sample], ['预签名有效期', d.expire_seconds + ' 秒'],
+    ['协议', d.scheme],
   ];
   $('#cosStatus').innerHTML = `
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">

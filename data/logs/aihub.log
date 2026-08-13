@@ -453,3 +453,5 @@
 2026-08-13 04:53:54-0700 WARNING [aihub:97253] 服务开始关闭 PID=97253。若你没有主动停止，通常是收到了外部信号（Ctrl-C / kill / pkill / 终端关闭），不是程序崩溃。
 2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Application shutdown complete.
 2026-08-13 04:53:54-0700 INFO  [uvicorn.error:97253] Finished server process [97253]
+2026-08-13 20:05:54+0800 INFO  [aihub:4253] 日志已启用: /Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log (level=INFO, 按天滚动, 保留 7 天)
+2026-08-13 20:05:54+0800 INFO  [aihub:4253] AI Hub 启动 PID=4253 时区=CST +0800 日志文件=/Users/sharecreators/Desktop/work/aihub/data/logs/aihub.log

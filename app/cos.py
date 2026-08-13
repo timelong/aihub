@@ -14,7 +14,8 @@ URL，不接受 base64。这里的做法是：
       secret_key: ${COS_SECRET_KEY}
       region: ap-guangzhou
       bucket: my-bucket-1250000000
-      prefix: aihub/tmp/        # 临时对象的 key 前缀
+      prefix: aihub/tmp/        # key 前缀，最终 key = 前缀/时间戳/文件名
+      timestamp_format: "%Y%m%d%H%M%S"   # 时间戳目录格式，写 epoch 用 Unix 秒
       expire_seconds: 1800      # 预签名有效期，要覆盖生成耗时（视频最长轮询 30 分钟）
       scheme: https
       enabled: true             # 留空/不写 = 配全了就自动启用
@@ -28,6 +29,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
+from datetime import datetime
 from typing import Any, AsyncIterator, Iterable
 
 from .config import load_config
@@ -36,6 +38,7 @@ from .providers.base import is_data_url, split_data_url
 log = logging.getLogger("aihub.cos")
 
 DEFAULT_PREFIX = "aihub/tmp/"
+DEFAULT_TS_FORMAT = "%Y%m%d%H%M%S"   # key 里的时间戳目录，写 epoch 则用 Unix 秒
 DEFAULT_EXPIRE = 1800          # 30 分钟，和视频轮询上限一致
 REQUIRED = ("secret_id", "secret_key", "region", "bucket")
 
@@ -87,6 +90,7 @@ def status() -> dict:
         "region": c.get("region") or "",
         "bucket": c.get("bucket") or "",
         "prefix": c.get("prefix") or DEFAULT_PREFIX,
+        "key_sample": build_key("image/png"),
         "scheme": c.get("scheme") or "https",
         "expire_seconds": expire_seconds(),
         # 只回显前 4 位，确认填的是哪把 key 就够了
@@ -148,11 +152,24 @@ def _delete_sync(key: str) -> None:
     cli.delete_object(Bucket=c["bucket"], Key=key)
 
 
+def build_key(mime: str = "image/png") -> str:
+    """对象 key = 配置的前缀 / 时间戳 / 文件名。
+
+    例：aihub/tmp/20260813192450/9f2c….png
+    时间戳格式可用 cos.timestamp_format 改，写 epoch 则用 Unix 秒。
+    """
+    fmt = str(conf().get("timestamp_format") or DEFAULT_TS_FORMAT)
+    now = datetime.now()
+    ts = str(int(now.timestamp())) if fmt.lower() == "epoch" else now.strftime(fmt)
+    prefix = (conf().get("prefix") or DEFAULT_PREFIX).strip().strip("/")
+    name = f"{uuid.uuid4().hex}.{_EXT.get(mime, 'png')}"
+    return "/".join(p for p in (prefix, ts, name) if p)
+
+
 async def upload_data_url(data_url: str) -> tuple[str, str]:
     """上传一张 base64 图片，返回 (对象 key, 预签名下载 URL)。"""
     mime, raw = split_data_url(data_url)
-    key = (conf().get("prefix") or DEFAULT_PREFIX).lstrip("/") \
-        + f"{uuid.uuid4().hex}.{_EXT.get(mime, 'png')}"
+    key = build_key(mime)
     await asyncio.to_thread(_put_sync, key, raw, mime)
     url = await asyncio.to_thread(_sign_sync, key)
     log.info("COS 已上传 key=%s 大小=%.1fKB 预签名有效期=%ds",
