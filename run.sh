@@ -3,11 +3,26 @@
 set -e
 cd "$(dirname "$0")"
 
+# 最低 Python 3.9（macOS 自带的就是 3.9.6）
+PY=${PYTHON:-python3}
+if ! "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
+  echo "✗ 需要 Python 3.9+，当前 $("$PY" -V 2>&1)（$(command -v "$PY")）"
+  echo "  可用 brew install python@3.12 后再跑，或指定其它解释器：PYTHON=python3.12 ./run.sh"
+  exit 1
+fi
+
 if [ ! -d .venv ]; then
-  echo "▶ 创建虚拟环境 .venv"
-  python3 -m venv .venv
+  echo "▶ 创建虚拟环境 .venv（$("$PY" -V 2>&1)）"
+  "$PY" -m venv .venv
 fi
 source .venv/bin/activate
+
+# 已存在的 .venv 如果是旧版本 Python 建的，也要拦一下并给出修复命令
+if ! python -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
+  echo "✗ .venv 里的 Python 是 $(python -V 2>&1)，低于 3.9。请重建："
+  echo "  rm -rf .venv && ./run.sh"
+  exit 1
+fi
 
 if [ ! -f .venv/.deps_ok ]; then
   echo "▶ 安装依赖"

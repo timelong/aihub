@@ -9,7 +9,9 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any
+# 注意：pydantic 模型字段与 FastAPI 路由参数的注解会在运行时被求值，
+# 所以这两处只能用 Optional[X]，不能用 3.10+ 才支持的 X | None（见 README「Python 版本」）。
+from typing import Any, Optional
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
@@ -71,7 +73,7 @@ async def access_log(request: Request, call_next):
 
 
 @app.get("/api/logs")
-def api_logs(lines: int = 200, file: str | None = None, q: str = "",
+def api_logs(lines: int = 200, file: Optional[str] = None, q: str = "",
              level: str = "") -> dict:
     """回看 / 搜索日志。
 
@@ -163,7 +165,7 @@ def api_log_delete(name: str) -> dict:
 
 # ============================ 数据模型 ============================
 class ChatReq(BaseModel):
-    conversation_id: str | None = None
+    conversation_id: Optional[str] = None
     model: str
     message: str = ""
     images: list[str] = Field(default_factory=list)
@@ -196,14 +198,14 @@ class ConfigReq(BaseModel):
 
 
 class StorageReq(BaseModel):
-    image_dir: str | None = None
-    video_dir: str | None = None
+    image_dir: Optional[str] = None
+    video_dir: Optional[str] = None
 
 
 class DefaultsReq(BaseModel):
-    chat: str | None = None
-    image: str | None = None
-    video: str | None = None
+    chat: Optional[str] = None
+    image: Optional[str] = None
+    video: Optional[str] = None
 
 
 # ============================ 模型 / 配置 ============================
@@ -587,7 +589,7 @@ async def _watch_video_inner(jid: str, pid: str, model_id: str, remote: str) -> 
 
 
 @app.get("/api/jobs")
-def api_jobs(kind: str | None = None, include_hidden: bool = False) -> dict:
+def api_jobs(kind: Optional[str] = None, include_hidden: bool = False) -> dict:
     return {"items": storage.list_jobs(kind, include_hidden=include_hidden)}
 
 
@@ -620,7 +622,7 @@ def api_job_restore(jid: str) -> dict:
 
 
 @app.post("/api/jobs/clear")
-def api_jobs_clear(kind: str | None = None) -> dict:
+def api_jobs_clear(kind: Optional[str] = None) -> dict:
     """清空列表：成功的隐藏（记录和文件都留着），失败/未完成的删记录。"""
     r = storage.clear_jobs(kind)
     log.info("清空 %s 列表：隐藏 %d 条（保留文件），删除 %d 条无结果记录",

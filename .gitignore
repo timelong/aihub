@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .env
 data/
+data/aihub.db
+data/logs/aihub.log
+data/logs/*.log
+.idea/

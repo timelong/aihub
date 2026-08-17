@@ -15,6 +15,15 @@
 
 ## 一、快速开始
 
+**环境要求：Python 3.9+**（macOS 系统自带的 `python3` 就是 3.9.6，可直接用；
+Linux/Windows 用 3.10+ 更省心）。低于 3.9 启动时会直接给出提示，不会报一堆看不懂的错。
+
+> 代码里普通函数用了 `X | None` 这种 3.10 写法，但因为每个模块都有
+> `from __future__ import annotations`，注解不会在运行时求值，所以 3.9 能跑。
+> **例外**：pydantic 模型字段和 FastAPI 路由参数的注解**会**被运行时求值，
+> 这两处必须写 `Optional[X]`——改这两处代码时注意别退回 `X | None`，
+> 否则 3.9 会报 `TypeError: unsupported operand type(s) for |`。
+
 ```bash
 cd aihub
 cp .env.example .env      # 填入你有的 API Key（不需要全填）
