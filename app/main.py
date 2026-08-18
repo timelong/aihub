@@ -30,7 +30,8 @@ from .config import (MEDIA_DIR, ROOT, defaults_raw, find_model_meta, load_config
                      patch_section, raw_config_text, resolve_dir, save_config,
                      set_defaults, set_storage_dirs, storage_dirs, storage_raw)
 from .logging_setup import preview, setup as setup_logging
-from .providers.base import ProviderError, is_data_url, ref_images, split_data_url
+from .providers.base import (ProviderError, is_data_url, limit_refs,
+                            ref_images, split_data_url)
 
 LOG_FILE = setup_logging()
 log = logging.getLogger("aihub")
@@ -472,26 +473,34 @@ async def api_image(req: ImageReq) -> dict:
         prov, model_id = providers.resolve(req.model)
     except Exception as e:
         raise HTTPException(400, str(e))
-    refs = ref_images(req.params)
     meta = find_model_meta(prov.id, model_id, "image")
+    # 参考图张数上限：模型的 max_images 和服务商硬限制取小（0 = 不限）
+    limits = [n for n in (int(meta.get("max_images") or 0), prov.max_ref_images) if n > 0]
+    params_in, dropped = limit_refs(req.params, min(limits) if limits else 0)
+    refs = ref_images(params_in)
     allowed = [str(s) for s in (meta.get("sizes") or [])]
     size = str(req.params.get("size") or "")
-    job = storage.create_job("image", prov.id, model_id, req.prompt, req.params)
+    job = storage.create_job("image", prov.id, model_id, req.prompt, params_in)
     storage.update_job(job["id"], status="running")
 
     with logctx.bind(job=job["id"], model=req.model):
+        if dropped:
+            log.warning("该模型最多支持 %d 张参考图，多出的 %d 张已忽略",
+                        len(refs), dropped)
         if allowed and size and size not in allowed:
             log.warning("出图尺寸 %s 不在该模型支持列表 %s 内，仍按请求发出", size, allowed)
-        log.info("出图开始 模型=%s(%s) 尺寸=%s 数量=%s 参考图%d张 prompt=%s 其它参数=%s",
+        log.info("出图开始 模型=%s(%s) 尺寸=%s 数量=%s 参考图%d张(%s) prompt=%s 其它参数=%s",
                  meta.get("name") or model_id, model_id, size or "默认",
-                 req.params.get("n", 1), len(refs), preview(req.prompt, 300),
+                 req.params.get("n", 1), len(refs),
+                 ("经COS公网URL" if prov.ref_mode == "url" else "直传base64") if refs else "无",
+                 preview(req.prompt, 300),
                  preview({k: v for k, v in req.params.items()
                           if k not in ("images", "image_url", "size", "n")}))
         t0 = time.perf_counter()
         try:
             # 只认公网 URL 的服务商：参考图先经 COS 上传成临时预签名 URL，
             # 退出这个 with 时（无论成功失败）临时对象立刻删除。
-            async with cos.public_refs(req.params, prov.public_url_refs) as p:
+            async with cos.public_refs(params_in, prov.ref_mode == "url") as p:
                 urls = await prov.generate_image(model_id, req.prompt, p)
         except Exception as e:  # noqa: BLE001
             log.error("出图失败 用时%.1fs: %s", time.perf_counter() - t0, e)
@@ -535,7 +544,7 @@ async def api_video(req: VideoReq, bg: BackgroundTasks) -> dict:
         cos_keys: list[str] = []
         params = req.params
         try:
-            if prov.public_url_refs and any(
+            if prov.ref_mode == "url" and any(
                     is_data_url(u) for u in ref_images(req.params)):
                 params, cos_keys = await cos.upload_refs(req.params)
             remote = await prov.submit_video(model_id, req.prompt, params)

@@ -496,6 +496,7 @@ async function loadModels(){
         o.value = p.id+'/'+m.id; o.textContent = m.name || m.id;
         o.dataset.vision = m.vision?'1':'';
         o.dataset.imageInput = m.image_input?'1':'';
+        o.dataset.maxImages = m.max_images || '';
         if(m.sizes && m.sizes.length) o.dataset.sizes = JSON.stringify(m.sizes);
         g.appendChild(o);
       });
@@ -725,8 +726,19 @@ $('#input').addEventListener('input', function(){ this.style.height='auto';
   this.style.height = Math.min(this.scrollHeight, 220)+'px'; });
 
 /* ---------- 图片生成 ---------- */
+function maxRefs(){                        // 0 = 未配上限
+  const o = $('#imgModel').selectedOptions[0];
+  return parseInt(o && o.dataset.maxImages) || 0;
+}
 $('#imgRef').onchange = e => {
-  [...e.target.files].forEach(f=>{
+  const cap = maxRefs(), picked = [...e.target.files];
+  let room = cap ? cap - imgRefs.length : picked.length;
+  if(cap && picked.length > room){
+    toast(room > 0
+      ? `该模型最多支持 ${cap} 张参考图，只取前 ${room} 张`
+      : `已经选满 ${cap} 张参考图，先删掉几张再加`);
+  }
+  picked.slice(0, Math.max(room, 0)).forEach(f=>{
     const r = new FileReader();
     r.onload = () => { imgRefs.push(r.result); renderRefs(); };
     r.readAsDataURL(f);
@@ -762,13 +774,24 @@ function fillSizes(){
   $('#imgSizeHint').textContent = o && o.dataset.sizes
     ? '该模型官方支持的尺寸' : '通用尺寸（该模型未在 config.yaml 里配 sizes）';
 }
-$('#imgModel').onchange = () => { fillSizes(); updImgHint(); };
+$('#imgModel').onchange = () => {
+  const cap = maxRefs();
+  if(cap && imgRefs.length > cap){
+    const drop = imgRefs.length - cap;
+    imgRefs = imgRefs.slice(0, cap);
+    toast(`该模型最多支持 ${cap} 张参考图，已移除多出的 ${drop} 张`);
+    renderRefs();
+  }
+  fillSizes(); updImgHint();
+};
 function updImgHint(){
   const o = $('#imgModel').selectedOptions[0];
   if(!imgRefs.length){ $('#imgRefHint').textContent =
       '不传参考图即为文生图；传了就走图生图/图片编辑。'; return; }
+  const cap = maxRefs();
   $('#imgRefHint').innerHTML = o && o.dataset.imageInput
     ? `已选 ${imgRefs.length} 张参考图，将走图生图。`
+      + (cap ? `该模型最多 ${cap} 张${imgRefs.length >= cap ? '（已选满）' : ''}。` : '')
     : `已选 ${imgRefs.length} 张参考图，但该模型在 config.yaml 里没标记 <code>image_input: true</code>，`
       + `如果服务商不支持会直接报错。`;
 }

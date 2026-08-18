@@ -23,6 +23,30 @@ class BaseProvider:
     # True = 该服务商的图片入参只认公网 URL，不吃 base64。
     # 本地上传的图会先经腾讯云 COS 转成临时预签名 URL（见 app/cos.py）。
     public_url_refs = False
+    # True = 即使 public_url_refs 也照样能吃 base64（实测过才置 True）。
+    # 这类服务商在 COS 关掉/没配时会自动降级为直传 base64，而不是报错。
+    base64_refs_ok = False
+    # 服务商对参考图张数的硬限制，0 = 不限/未知。
+    # 模型级别的限制写在 config.yaml 的 max_images，两者取小。
+    max_ref_images = 0
+
+    @property
+    def ref_mode(self) -> str:
+        """参考图怎么送给服务商："url"（经 COS 转公网链接）还是 "base64"（直传）。
+
+        config.yaml 里给该 provider 写 ref_mode: base64 / url 可强制指定；
+        不写（或 auto）时：本来就吃 base64 的 → base64；
+        只认 URL 的 → 有 COS 就用 COS，COS 关掉且实测能吃 base64 的降级直传。
+        """
+        want = str(self.conf.get("ref_mode") or "auto").lower()
+        if want in ("base64", "url"):
+            return want
+        if not self.public_url_refs:
+            return "base64"
+        from .. import cos                      # 延迟导入避免循环
+        if self.base64_refs_ok and not cos.is_configured():
+            return "base64"
+        return "url"
 
     def __init__(self, conf: dict[str, Any]):
         self.conf = conf
@@ -139,3 +163,16 @@ def ref_images(params: dict) -> list[str]:
     if not imgs and params.get("image_url"):
         imgs = [params["image_url"]]
     return imgs
+
+
+def limit_refs(params: dict, limit: int) -> tuple[dict, int]:
+    """把参考图裁到 limit 张，返回 (新 params, 被丢掉的张数)。
+
+    limit<=0 表示不限。前端已按 max_images 拦过一次，这里是服务端兜底，
+    免得多出来的图被服务商静默忽略、或者直接 400。
+    """
+    refs = ref_images(params)
+    if limit <= 0 or len(refs) <= limit:
+        return params, 0
+    kept = refs[:limit]
+    return {**params, "images": kept, "image_url": kept[0]}, len(refs) - len(kept)

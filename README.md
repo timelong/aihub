@@ -158,6 +158,11 @@ BOCHA_API_KEY=       # 博查，国内直连
   在 `config.yaml` 给模型加 `image_input: true` 后，界面会提示该模型支持图生图；
   个别兼容服务（如硅基流动）的图生图是在 `/images/generations` 传 `image` 字段，
   给该 provider 加 `image_edit_mode: json` 即可
+- **多参考图**：能吃多张的服务商会把所有图都传上去（即梦组图、Gemini、OpenAI
+  `image[]`、魔搭 `image_url` 数组）。张数上限写在模型的 `max_images`，
+  界面会在上传时就拦住并提示，服务端再兜底裁剪一次——不会出现多选了却被
+  静默丢弃的情况。魔搭实测上限 4 张（超了接口直接返回
+  `image_url count N exceeds maximum limit of 4`）
 - 结果自动下载到本地（第三方图床链接通常 24h 过期，本地留存不怕丢）
 - **生成完有明确反馈**：绿色提示「✅ 生成成功：N 张，用时 Ns，已保存到 …」；
   结果卡片显示缩略图（点开原图）、状态与用时、模型与尺寸、生成时间、
@@ -170,7 +175,11 @@ BOCHA_API_KEY=       # 博查，国内直连
 - **保存目录可配置**：见下方「保存目录」一节
 
 **☁️ 腾讯云 COS（临时图床）**
-- 阿里百炼图生视频、智谱 CogVideoX、魔搭图生图这些接口**只认公网图片 URL**，不吃 base64。
+- 参考图怎么送给服务商由 provider 的 `ref_mode` 决定：`base64` 直传、`url` 走 COS，
+  不写则自动判断（吃 base64 的直传；只认 URL 的走 COS，而 COS 关掉时**魔搭会自动
+  降级成 base64 直传**——实测魔搭 `image_url` 也收 data URL）。
+  想彻底不用 COS：`cos: enabled: false`，或给 modelscope 段写 `ref_mode: base64`
+- 阿里百炼图生视频、智谱 CogVideoX 这些接口**只认公网图片 URL**，不吃 base64。
   本地上传的参考图会：**上传对象 → 取预签名 URL 交给服务商 → 任务结束立即删除对象**
 - 删除时机：出图是请求结束就删；视频是异步任务，等后台轮询出结果（成功/失败/超时）才删，
   否则上游还没来取图就没了

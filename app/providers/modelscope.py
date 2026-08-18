@@ -18,7 +18,9 @@ from .openai_compat import OpenAICompatProvider
 
 class ModelScopeProvider(OpenAICompatProvider):
     kind = "modelscope"
-    public_url_refs = True     # 图片入参必须是公网可访问的 URL
+    public_url_refs = True     # 默认经 COS 转公网 URL
+    base64_refs_ok = True      # 实测 image_url 也收 data:image/...;base64,（COS 关了就直传）
+    max_ref_images = 4         # 实测服务端硬限制：超过 4 张直接 400
 
     def __init__(self, conf: dict[str, Any]):
         super().__init__(conf)
@@ -41,8 +43,8 @@ class ModelScopeProvider(OpenAICompatProvider):
         if params.get("seed") is not None:
             body["seed"] = int(params["seed"])
         refs = ref_images(params)
-        if refs:  # 图生图
-            body["image_url"] = refs[0]
+        if refs:  # 图生图：image_url 收数组，多张即多参考图（最多 4 张）
+            body["image_url"] = refs
 
         headers = self.headers()
         if self.async_image:

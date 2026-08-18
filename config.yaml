@@ -20,10 +20,16 @@
 #   image_input: true  出图/视频模型支持传参考图（图生图 / 图生视频）
 #   sizes: [...]       该出图模型支持/推荐的尺寸，界面「尺寸」下拉只列这些；
 #                      不写则用通用列表。写第一个为默认值。
+#   max_images: 4      参考图最多传几张（多参考图/组图）。界面会按这个数拦住
+#                      多选，服务端也会兜底裁剪。不写 = 不限制/未知。
 #
 # provider 级可选:
 #   image_edit_mode: json   OpenAI 兼容接口的图生图改走 /images/generations
 #                           的 image 字段（默认走 /images/edits 上传文件）
+#   ref_mode: base64|url    参考图怎么送给服务商：base64 直传，或先传腾讯云 COS
+#                           换成公网预签名 URL。不写 = 自动：本来就吃 base64 的
+#                           直传；只认 URL 的（魔搭/百炼/智谱）走 COS，而 COS 关掉
+#                           时魔搭会自动降级成 base64（实测可行）
 # ==========================================================
 
 providers:
@@ -103,6 +109,7 @@ providers:
     base_url: https://api-inference.modelscope.cn/v1
     api_key: ${MODELSCOPE_API_KEY}
     async_image: true          # 出图走异步任务模式，false 则同步（易超时）
+    ref_mode: base64
     models:
       chat:
         - id: Qwen/Qwen3-235B-A22B-Instruct-2507
@@ -121,9 +128,12 @@ providers:
         - id: Qwen/Qwen-Image-Edit-2511
           name: Qwen-Image 图生图
           image_input: true
+          max_images: 4          # 实测魔搭 image_url 最多 4 张
           sizes: [1328x1328, 1664x928, 928x1664, 1472x1104, 1104x1472, 1584x1056, 1056x1584]
-        - id: MAILAND/majicflus_v1
-          name: majicFlus 写实
+        - id: black-forest-labs/FLUX.2-klein-9B
+          name: FLUX 图生图
+          image_input: true      # 统一模型：文生图 + 图片编辑 + 多参考图
+          max_images: 4          # 实测魔搭 image_url 最多 4 张
           sizes: [1024x1024, 832x1216, 1216x832]
       video: []
 
@@ -258,6 +268,8 @@ cos:
   expire_seconds: 1800            # 预签名有效期(秒)，要覆盖生成耗时
   scheme: https
   # enabled: false                # 显式关闭；不写则「配全了就自动启用」
+  #                               # 关掉后：魔搭自动改用 base64 直传；
+  #                               # 百炼图生视频/智谱只认公网 URL，会直接报错
 
 # ==========================================================
 # 日志
