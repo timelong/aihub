@@ -9,6 +9,8 @@ from typing import Any, AsyncIterator
 import httpx
 
 from ..logging_setup import preview
+from .retry import RetryTransport
+from .retry import settings as retry_settings
 
 TIMEOUT = httpx.Timeout(connect=15.0, read=300.0, write=60.0, pool=15.0)
 log = logging.getLogger("aihub.provider")
@@ -72,9 +74,15 @@ class BaseProvider:
 
     # --- 工具 ---
     def client(self, **kw) -> httpx.AsyncClient:
-        """带日志钩子的 httpx client：每个上游请求/响应都会记到日志文件。"""
+        """带日志钩子 + 自动重试的 httpx client。
+
+        重试放在 transport 层，所以对话/出图/视频/轮询全都覆盖到了，
+        策略见 app/providers/retry.py 和 config.yaml 的 retry 段。
+        """
         hooks = {"request": [self._on_request], "response": [self._on_response]}
         kw.setdefault("event_hooks", hooks)
+        kw.setdefault("transport", RetryTransport(
+            httpx.AsyncHTTPTransport(), self.conf, self.id))
         return httpx.AsyncClient(timeout=TIMEOUT, **kw)
 
     async def _on_request(self, request: httpx.Request) -> None:
@@ -139,8 +147,15 @@ class BaseProvider:
             "Google Gemini Flash Image，或 OpenAI 兼容接口的图片编辑模型。"
         )
 
-    @staticmethod
-    def check(resp: httpx.Response) -> dict:
+    def check(self, resp: httpx.Response) -> dict:
+        """非 2xx 一律变成人话错误；限流额外说明已经重试过、下一步怎么办。"""
+        if resp.status_code == 429:
+            n = retry_settings(self.conf)["attempts"]
+            raise ProviderError(
+                f"{self.name} 限流（HTTP 429）"
+                + (f"，已自动重试 {n - 1} 次仍未通过" if n > 1 else "")
+                + f"：{resp.text[:400]}。可以等一会儿再试，或换用其它服务商的同类模型。"
+            )
         if resp.status_code >= 400:
             raise ProviderError(f"HTTP {resp.status_code}: {resp.text[:600]}")
         return resp.json()

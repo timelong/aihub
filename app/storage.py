@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS messages (
     images TEXT DEFAULT '[]',
     reasoning TEXT DEFAULT '',
     tools TEXT DEFAULT '[]',
+    attachments TEXT DEFAULT '[]',   -- 附件解析结果（含正文，多轮追问还要用）
     model TEXT,
     created_at REAL,
     FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -49,6 +50,14 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at REAL,
     updated_at REAL
 );
+CREATE TABLE IF NOT EXISTS presets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,            -- 预设名，如「代码审查」
+    content TEXT NOT NULL,         -- 系统提示词正文
+    params TEXT DEFAULT '{}',      -- 可选：连带保存 temperature 等
+    created_at REAL,
+    updated_at REAL
+);
 """
 
 
@@ -65,6 +74,8 @@ def init() -> None:
         cols = {r["name"] for r in c.execute("PRAGMA table_info(messages)")}
         if "tools" not in cols:  # 老库补上工具调用轨迹字段
             c.execute("ALTER TABLE messages ADD COLUMN tools TEXT DEFAULT '[]'")
+        if "attachments" not in cols:  # 老库补上附件字段
+            c.execute("ALTER TABLE messages ADD COLUMN attachments TEXT DEFAULT '[]'")
         jcols = {r["name"] for r in c.execute("PRAGMA table_info(jobs)")}
         if "hidden" not in jcols:  # 从页面隐藏（记录与磁盘文件都保留）
             c.execute("ALTER TABLE jobs ADD COLUMN hidden INTEGER DEFAULT 0")
@@ -111,7 +122,8 @@ def get_conversation(cid: str) -> dict | None:
         ).fetchall()
     conv["messages"] = [
         {**dict(m), "images": json.loads(m["images"] or "[]"),
-         "tools": json.loads((dict(m).get("tools") or "[]"))} for m in msgs
+         "tools": json.loads((dict(m).get("tools") or "[]")),
+         "attachments": json.loads((dict(m).get("attachments") or "[]"))} for m in msgs
     ]
     return conv
 
@@ -134,15 +146,16 @@ def delete_conversation(cid: str) -> None:
 
 
 def add_message(cid: str, role: str, content: str, images: list | None = None,
-                reasoning: str = "", model: str = "", tools: list | None = None) -> dict:
+                reasoning: str = "", model: str = "", tools: list | None = None,
+                attachments: list | None = None) -> dict:
     mid = new_id()
     now = _now()
     with _conn() as c:
         c.execute(
             "INSERT INTO messages(id,conversation_id,role,content,images,reasoning,"
-            "model,tools,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "model,tools,attachments,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
             (mid, cid, role, content, json.dumps(images or []), reasoning, model,
-             json.dumps(tools or []), now),
+             json.dumps(tools or []), json.dumps(attachments or []), now),
         )
         c.execute("UPDATE conversations SET updated_at=? WHERE id=?", (now, cid))
         # 首条用户消息作为标题
@@ -153,7 +166,7 @@ def add_message(cid: str, role: str, content: str, images: list | None = None,
             c.execute("UPDATE conversations SET title=? WHERE id=?", (content.strip()[:30], cid))
     return {"id": mid, "role": role, "content": content, "images": images or [],
             "reasoning": reasoning, "model": model, "tools": tools or [],
-            "created_at": now}
+            "attachments": attachments or [], "created_at": now}
 
 
 # ---------------- 生成任务 ----------------
@@ -268,3 +281,89 @@ def list_jobs(kind: str | None = None, limit: int = 50,
         j["params"] = json.loads(j.get("params") or "{}")
         out.append(j)
     return out
+
+
+# ---------------- 消息级操作（重发 / 编辑 / 删除） ----------------
+def get_message(mid: str) -> dict | None:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM messages WHERE id=?", (mid,)).fetchone()
+    if not row:
+        return None
+    m = dict(row)
+    m["images"] = json.loads(m.get("images") or "[]")
+    m["tools"] = json.loads(m.get("tools") or "[]")
+    m["attachments"] = json.loads(m.get("attachments") or "[]")
+    return m
+
+
+def delete_message(mid: str, with_following: bool = False) -> int:
+    """删一条消息；with_following=True 时连它之后的一起删。
+
+    「重新生成」「编辑后重发」都是先把这条及之后的清掉，再按新内容重跑，
+    否则历史里会留下上一轮的答案，模型会被自己的旧回答带偏。
+    """
+    with _conn() as c:
+        row = c.execute(
+            "SELECT conversation_id, created_at FROM messages WHERE id=?", (mid,)
+        ).fetchone()
+        if not row:
+            return 0
+        if with_following:
+            cur = c.execute(
+                "DELETE FROM messages WHERE conversation_id=? AND created_at>=?",
+                (row["conversation_id"], row["created_at"]),
+            )
+        else:
+            cur = c.execute("DELETE FROM messages WHERE id=?", (mid,))
+        c.execute("UPDATE conversations SET updated_at=? WHERE id=?",
+                  (_now(), row["conversation_id"]))
+        return cur.rowcount
+
+
+def search_conversations(q: str, limit: int = 50) -> list[dict]:
+    """按标题或消息正文搜会话，附带命中的那条消息片段。"""
+    like = f"%{q}%"
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT c.id, c.title, c.model, c.updated_at,"
+            "  (SELECT m.content FROM messages m WHERE m.conversation_id=c.id"
+            "     AND m.content LIKE ? ORDER BY m.created_at LIMIT 1) AS hit"
+            " FROM conversations c"
+            " WHERE c.title LIKE ? OR EXISTS"
+            "   (SELECT 1 FROM messages m2 WHERE m2.conversation_id=c.id AND m2.content LIKE ?)"
+            " ORDER BY c.updated_at DESC LIMIT ?",
+            (like, like, like, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------------- 提示词预设 ----------------
+def list_presets() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM presets ORDER BY updated_at DESC").fetchall()
+    return [{**dict(r), "params": json.loads(r["params"] or "{}")} for r in rows]
+
+
+def save_preset(name: str, content: str, params: dict | None = None,
+                pid: str = "") -> dict:
+    """新建或按 id 更新一个预设。同名视为同一个，直接覆盖。"""
+    now = _now()
+    with _conn() as c:
+        if not pid:
+            row = c.execute("SELECT id FROM presets WHERE name=?", (name,)).fetchone()
+            pid = row["id"] if row else ""
+        if pid:
+            c.execute("UPDATE presets SET name=?,content=?,params=?,updated_at=? WHERE id=?",
+                      (name, content, json.dumps(params or {}), now, pid))
+        else:
+            pid = new_id()
+            c.execute("INSERT INTO presets(id,name,content,params,created_at,updated_at)"
+                      " VALUES(?,?,?,?,?,?)",
+                      (pid, name, content, json.dumps(params or {}), now, now))
+        row = c.execute("SELECT * FROM presets WHERE id=?", (pid,)).fetchone()
+    return {**dict(row), "params": json.loads(row["params"] or "{}")}
+
+
+def delete_preset(pid: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM presets WHERE id=?", (pid,))

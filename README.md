@@ -30,6 +30,10 @@ cp .env.example .env      # 填入你有的 API Key（不需要全填）
 ./run.sh                  # 自动建 venv、装依赖、启动
 ```
 
+> 附件解析用到 `pypdf` / `python-docx` / `python-pptx` / `openpyxl`，已经写进
+> requirements.txt。**从旧版本升上来的记得重装依赖**（`rm .venv/.deps_ok && ./run.sh`，
+> 或直接 `pip install -r requirements.txt`），否则传 PDF/PPT 时会提示缺依赖。
+
 服务起来后会自动打开浏览器（不想自动打开就用 `NO_OPEN=1 ./run.sh`），
 也可以手动访问 <http://127.0.0.1:8000>
 
@@ -102,12 +106,82 @@ defaults:                    # 各页面默认选中的模型
 ## 四、功能说明
 
 **💬 对话**
-- SSE 流式输出，打字机效果，可中途停止
-- 多轮上下文，会话自动持久化到 SQLite，左侧可切换/删除
+- SSE 流式输出，打字机效果；**点「停止」会把已经生成的部分存下来**（标注「已手动停止」），
+  不会白跑一轮 token
+- 多轮上下文，会话自动持久化到 SQLite，左侧可切换/重命名（✎）/删除，并支持**按标题和正文搜索**
 - 多模态：点 🖼 上传图片提问（模型需标记 `vision: true`）
 - 推理模型（DeepSeek R1、Gemini thinking）的思维链单独灰色展示
-- 参数面板：System Prompt、Temperature、Top P、Max Tokens、注入当前时间
+- 参数面板：提示词预设、System Prompt、Temperature、Top P、Max Tokens、注入当前时间
 - **工具（联网搜索 / 网页抓取）**：见下方「工具」一节
+
+**✏️ 消息操作**（鼠标移到消息上才出现，不占视线）
+
+| 操作 | 用户消息 | 助手消息 | 说明 |
+|---|---|---|---|
+| 复制 | ✅ | ✅ | 复制的是原始 markdown，不是渲染后的文本 |
+| 编辑重发 | ✅ | — | 改完内容重跑这一轮 |
+| 重新生成 | — | ✅ | 找到对应的用户消息，按原内容重跑 |
+| 删除 | ✅ | ✅ | 只删这一条 |
+
+> 「编辑重发」和「重新生成」都会先把那条用户消息**及其之后的所有消息**删掉再重跑——
+> 否则历史里留着上一轮的答案，模型会被自己的旧回答带偏。
+
+**📝 Markdown 渲染**
+- 标题、列表、表格、引用、分割线、链接、图片、粗斜体删除线、行内码
+- 代码块带语言标签、**一键复制**和语法高亮（自带的极简高亮，不依赖外部资源）
+- LaTeX（`$$…$$`）和 mermaid 代码块体量太大，不打包进来，**用到时才从 CDN 懒加载**；
+  没网就原样显示文本并提示一次，不影响其它内容
+- 渲染器是手写的（约 90 行），因为这是个无构建的单文件前端，
+  marked + highlight.js + katex 全量 vendor 进来有好几 MB
+
+**⭐ 提示词预设**
+- 参数面板顶部：选预设 → 「应用」写入 System Prompt（连带存的 temperature 一起恢复）
+- 「另存为…」把当前提示词存成预设，**同名直接覆盖**；「删除」移除预设
+- 存在 SQLite 的 `presets` 表里，和会话一样跟着 `data/aihub.db` 走
+
+**📎 附件（PDF / Word / PPT / Excel / 文本）**
+- composer 上的 📎 选文件，服务端**本地解析成文本**随消息发给模型
+  （各家 chat 接口只收文本和图片，没有"传文件"的通道，所以必须先在本地抽）
+- 支持：PDF、Word(.docx)、PPT(.pptx)、Excel(.xlsx/.xlsm)，以及
+  txt / md / csv / json / yaml / 各种代码文件。老格式 .doc/.ppt/.xls 请先另存为新格式
+- 抽取质量：PPT 按页给出标题、正文、表格和**演讲备注**；Word 保留标题层级和表格；
+  Excel 按工作表逐行；PDF 按页。中文文本自动试 utf-8 / gb18030 / big5 解码
+- **抽不出来会明说**：扫描件 PDF、纯图 PPT 会直接告诉你「这是图片型文件，建议换看图模型或先 OCR」，
+  而不是悄悄发一段空内容给模型
+- 附件卡片显示文件名、字数和页数等信息；超长会截断并标 ⚠，上限可配：
+
+```yaml
+attachments:
+  max_chars: 60000      # 单个附件最多取多少字
+  total_chars: 150000   # 一次请求所有附件合计
+  max_mb: 30            # 单文件大小上限
+```
+
+- 附件正文会随消息存库，所以**第二轮追问「刚才那份 PPT 里…」模型还看得到**；
+  回传给前端的会话详情里剥掉正文，只留文件名和字数
+- 单个文件解析失败不影响同批其它文件，错误逐个提示
+
+**🔁 自动重试 / 换模型**
+- 撞到限流（429）或网关抖动（5xx）时自动退避重试，等待时间翻倍递增；
+  服务端给了 `Retry-After` 就按它说的等。对话、出图、视频提交、轮询全都覆盖
+  （实现在 transport 层，见 [`app/providers/retry.py`](app/providers/retry.py)）
+- **不会重复扣费**：429/5xx 说明这次请求肯定没被处理，重试是安全的；
+  而「连不上 / 读超时」这种不知道对方收没收到的错误，只对 GET（轮询）重试，
+  绝不重发出图/视频的提交请求
+- 重试到底还是失败时，界面右下角会弹一个面板：**要不要换个模型重试**。
+  备选列表是「同能力 + 别的服务商 + 已配 key」，按和当前模型名字的相似度排序，
+  点一下就用新模型重跑（对话会自动重发那一轮，出图会重新提交）
+- 日志里能看到每次重试：`[flaky] POST /v1/chat/completions 返回 429（限流），1.0s 后重试（第 2/3 次）`
+
+```yaml
+retry:
+  attempts: 3                    # 总共尝试几次，1 = 关掉重试
+  backoff: 2.0                   # 首次等待秒数，之后翻倍
+  max_backoff: 30.0              # 单次等待上限
+  statuses: [429, 500, 502, 503, 504]
+```
+
+> 某家服务商想单独设置，就在它自己的条目下写同名的 `retry` 段覆盖。
 
 **🕒 当前时间注入**
 - 模型只知道训练数据里的日期，问「今天几号」「最近」会答错，所以每次请求都会在
@@ -138,6 +212,9 @@ BOCHA_API_KEY=       # 博查，国内直连
 - 界面上会实时显示「调用了什么工具、搜到几条」，这条轨迹也会随会话存库
 
 **🎨 图片生成**
+- **异步任务**：提交后立刻返回，生成在后台跑，前端每 2 秒轮询一次进度。
+  关掉页面、切走、网络抖动都不会把任务弄丢，回来看列表就行
+  （脚本里想要一次调用拿结果，加 `?wait=true` 走同步模式）
 - 提示词 / 负向提示词 / 尺寸 / 数量 / 种子
 - **尺寸按模型走**：各家推荐分辨率差别很大（Qwen-Image 是 1328 系列、即梦用 2K/4K、
   DALL·E 3 只认三种），所以在 `config.yaml` 给出图模型写 `sizes`，界面「尺寸」下拉只列
@@ -226,6 +303,7 @@ storage:
 ```
 
 **🎬 视频生成**
+- 提交后前端会自动轮询，完成/失败都有提示（失败且是限流时同样可以换模型重试）
 - 文生视频 + 图生视频（上传首帧）
 - 时长 / 比例 / 分辨率
 - 异步任务：提交后后台轮询，界面每 5 秒自动刷新状态
@@ -342,7 +420,7 @@ class MyProvider(BaseProvider):
 | GET | `/api/fs?path=` | 浏览服务器目录（目录选择器用） |
 | POST | `/api/fs/mkdir` | 新建文件夹 |
 | POST | `/api/chat` | 流式对话（SSE） |
-| POST | `/api/image` | 同步出图 |
+| POST | `/api/image` | 提交出图任务（`?wait=true` 同步等结果） |
 | POST | `/api/video` | 提交视频任务 |
 | GET | `/api/jobs?kind=&include_hidden=` | 任务列表 |
 | DELETE | `/api/jobs/{id}` | 移除记录（有结果的只隐藏，不删文件） |
@@ -350,7 +428,13 @@ class MyProvider(BaseProvider):
 | POST | `/api/jobs/clear?kind=` | 清空列表（同上规则） |
 | GET | `/api/jobs/{id}` | 单个任务状态 |
 | GET·POST | `/api/conversations` | 会话列表 / 新建 |
-| GET·DELETE | `/api/conversations/{id}` | 会话详情 / 删除 |
+| GET·PATCH·DELETE | `/api/conversations/{id}` | 会话详情 / 重命名 / 删除 |
+| GET | `/api/conversations?q=` | 按标题+正文搜索会话 |
+| DELETE | `/api/messages/{id}?following=` | 删消息（`following=true` 连带其后全部） |
+| POST | `/api/attachments` | 上传文档并解析成文本（multipart） |
+| GET | `/api/attachments/info` | 支持的格式与大小上限 |
+| GET·POST | `/api/presets` | 提示词预设列表 / 保存（同名覆盖） |
+| DELETE | `/api/presets/{id}` | 删除预设 |
 | GET | `/media/{kind}/{name}` | 本地媒体文件（kind = image / video） |
 
 ---
