@@ -531,6 +531,11 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
 
     meta = find_model_meta(prov.id, model_id, "chat")
     with logctx.bind(conv=cid, model=req.model):
+        if req.images and not meta.get("vision"):
+            # 纯文本模型会把图片部分丢掉，然后回答"我没看到图片"。
+            # 前端已经拦了一道，这里留一条日志，方便排查"图明明发了却说没有"。
+            log.warning("该模型未标记 vision，收到 %d 张图片很可能被忽略；"
+                        "换视觉模型，或在 config.yaml 给它加 vision: true", len(req.images))
         log.info("对话开始 模型=%s(%s) 历史=%d条 图片=%d张 附件=%s 工具=%s 系统提示词=%d字 参数=%s",
                  meta.get("name") or model_id, model_id, len(msgs), len(req.images),
                  docs.summarize(req.attachments) or "无",

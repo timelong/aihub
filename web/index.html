@@ -832,9 +832,23 @@ function fallbackModels(cap, current){
   });
   return out.sort((a,b)=>b.score-a.score);
 }
+/* 能看图的对话模型（含当前服务商，只要配了 key） */
+function visionModels(){
+  const cur = ($('#chatModel').value||'').split('/')[0];
+  const out = [];
+  (CFG.providers||[]).forEach(p=>{
+    if(!p.has_key) return;
+    const local = /localhost|127\.0\.0\.1/.test(p.base_url||'');
+    (p.chat||[]).forEach(m=>{ if(m.vision) out.push({ref:p.id+'/'+m.id,
+      label:`${m.name||m.id} · ${p.name}`,
+      // 同一家排最前（key 和额度都是现成的），本地服务排最后（多半没起）
+      rank: (p.id===cur ? 0 : 1) + (local ? 2 : 0)}); });
+  });
+  return out.sort((a,b)=>a.rank-b.rank);
+}
 let fbkPick = null;
-function offerFallback(cap, current, err, onPick){
-  const list = fallbackModels(cap, current);
+function offerFallback(cap, current, err, onPick, list){
+  list = list || fallbackModels(cap, current);
   if(!list.length) return false;           // 没有备选就别弹了，老老实实报错
   fbkPick = onPick;
   $('#fbkSel').innerHTML = list.map(x=>`<option value="${x.ref}">${esc(x.label)}</option>`).join('');
@@ -918,7 +932,11 @@ function applyDefaults(){
 $('#chatModel').onchange = updHint;
 function updHint(){
   const o = $('#chatModel').selectedOptions[0];
-  $('#chatHint').textContent = o ? (o.dataset.vision ? '该模型支持图片输入' : '纯文本模型') : '';
+  const el = $('#chatHint');
+  if(!o){ el.textContent = ''; return; }
+  const vis = !!o.dataset.vision;
+  el.textContent = vis ? '🖼 支持图片输入' : '纯文本模型（不能看图，📎 文档可用）';
+  el.style.color = vis ? 'var(--ok)' : 'var(--dim)';
 }
 
 /* ---------- 会话 ---------- */
@@ -1054,6 +1072,10 @@ async function resendFrom(userNode, text){
 
 /* ---------- 图片附件 ---------- */
 const pickImg = () => $('#fileInput').click();
+const canSeeImages = () => {
+  const o = $('#chatModel').selectedOptions[0];
+  return !!(o && o.dataset.vision);
+};
 $('#fileInput').onchange = e => {
   [...e.target.files].forEach(f=>{
     const r = new FileReader();
@@ -1061,6 +1083,13 @@ $('#fileInput').onchange = e => {
     r.readAsDataURL(f);
   });
   e.target.value='';
+  // 纯文本模型收到图片会静默忽略，然后回你"我没看到图片"——所以这里就得说清楚
+  if(!canSeeImages()){
+    const vis = visionModels();
+    toast('当前模型不支持看图，发送前需要换成视觉模型'
+      + (vis.length ? '（如 '+vis[0].label+'）' : '：config.yaml 里给能看图的模型加 vision: true'),
+      9000);
+  }
 };
 function renderAttach(){
   $('#attach').innerHTML = pending.map((u,i)=>
@@ -1144,6 +1173,20 @@ async function send(overrideText, overrideImgs, overrideDocs){
   if(!model) return toast('请先选择对话模型');
 
   const imgs = resend ? (overrideImgs||[]) : pending.slice();
+  if(imgs.length && !canSeeImages()){
+    // 不能悄悄发出去：纯文本模型会忽略图片，然后一本正经地说"没看到图片"
+    const vis = visionModels();
+    const msg = `当前模型「${$('#chatModel').selectedOptions[0].textContent}」不支持图片输入，`
+      + `发出去图会被忽略。`;
+    const offered = offerFallback('chat', model, msg, ref=>{
+      $('#chatModel').value = ref; updHint();
+      send(resend ? overrideText : undefined, resend ? overrideImgs : undefined,
+           resend ? overrideDocs : undefined);
+    }, vis.map(v=>({...v, score:0})));
+    if(!offered) toast(msg + ' 而且没有可用的视觉模型：先在 config.yaml 里给支持看图的'
+                       + '模型加 vision: true，并确认那家的 API Key 已配置。', 12000);
+    return;                       // 图片留在待发区，换完模型可以直接再发
+  }
   const userNode = addMsg('user', text, imgs, '', [], '', docs);
   userNode._docs = docs;              // 重发时要原样带上（含正文）
   if(!resend){ pending = []; renderAttach(); pendingDocs = []; renderFileChips();
