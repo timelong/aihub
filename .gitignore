@@ -7,3 +7,7 @@ data/aihub.db
 data/logs/aihub.log
 data/logs/*.log
 .idea/
+
+# macOS Finder 生成的目录元数据，和项目无关
+.DS_Store
+**/.DS_Store

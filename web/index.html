@@ -74,10 +74,55 @@
   .msg.user .ava{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0}
   .bubble{flex:1;min-width:0}
   .bubble .who{font-size:12px;color:var(--dim);margin-bottom:4px}
-  .body{white-space:pre-wrap;word-break:break-word}
-  .body code{background:#0b0d12;padding:1px 5px;border-radius:4px;font-size:13px}
+  /* 消息正文：markdown 渲染后的样式。整体不再 pre-wrap，交给各元素自己排版，
+     只有纯文本段落保留换行（.body p 里用 white-space:pre-wrap）。 */
+  .body{word-break:break-word;line-height:1.65}
+  .body>*:first-child{margin-top:0}
+  .body>*:last-child{margin-bottom:0}
+  .body p{margin:0 0 10px;white-space:pre-wrap}
+  .body h1,.body h2,.body h3,.body h4{margin:16px 0 8px;line-height:1.3;font-weight:650}
+  .body h1{font-size:20px} .body h2{font-size:17.5px} .body h3{font-size:15.5px}
+  .body h4{font-size:14px;color:var(--dim)}
+  .body ul,.body ol{margin:0 0 10px;padding-left:22px}
+  .body li{margin:3px 0}
+  .body li>p{margin:0}
+  .body blockquote{margin:0 0 10px;padding:2px 0 2px 12px;border-left:3px solid var(--line);
+                   color:var(--dim)}
+  .body hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+  .body a{color:var(--accent2)}
+  .body img{max-width:100%;border-radius:8px;border:1px solid var(--line)}
+  .body code{background:#0b0d12;padding:1px 5px;border-radius:4px;font-size:12.5px;
+             font-family:ui-monospace,Menlo,Consolas,monospace}
+  .body table{border-collapse:collapse;margin:0 0 12px;font-size:13px;display:block;
+              overflow-x:auto;max-width:100%}
+  .body th,.body td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .body th{background:var(--panel2);font-weight:600;white-space:nowrap}
+  .body tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  /* 代码块：头部显示语言 + 复制按钮 */
+  .cb{margin:0 0 12px;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+      background:#0b0d12}
+  .cbh{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--panel2);
+       border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
+  .cbh .sp{flex:1}
+  .cbh button{padding:1px 8px;font-size:11.5px;color:var(--dim)}
+  .cb pre{margin:0;padding:12px;overflow:auto;white-space:pre;background:transparent;border:0}
   .body pre{background:#0b0d12;border:1px solid var(--line);padding:12px;border-radius:8px;
-            overflow:auto;white-space:pre}
+            overflow:auto;white-space:pre;margin:0 0 12px}
+  .cb code,.body pre code{background:transparent;padding:0;font-size:12.5px}
+  /* 极简语法高亮（自带，不依赖外部资源） */
+  .hk{color:#c792ea} .hs{color:#c3e88d} .hc{color:#5c6773;font-style:italic}
+  .hn{color:#f78c6c} .hf{color:#82aaff}
+  .mermaid{margin:0 0 12px;text-align:center}
+  .mathblk{margin:0 0 12px;overflow-x:auto}
+  /* 消息操作条：hover 才显形，别一直占视线 */
+  .acts{display:flex;gap:4px;margin-top:6px;opacity:0;transition:opacity .12s}
+  .msg:hover .acts{opacity:1}
+  .acts button{padding:1px 7px;font-size:11.5px;color:var(--dim);background:transparent;
+               border-color:transparent}
+  .acts button:hover{color:var(--fg);border-color:var(--line);background:var(--panel2)}
+  .acts button.danger:hover{color:var(--err);border-color:var(--err)}
+  .editbox{display:flex;flex-direction:column;gap:8px}
+  .editbox textarea{min-height:80px}
   .think{border-left:2px solid var(--line);padding:6px 0 6px 12px;margin-bottom:8px;
          color:var(--dim);font-size:13px;white-space:pre-wrap}
   .tools{margin-bottom:8px;display:flex;flex-direction:column;gap:4px}
@@ -90,6 +135,19 @@
   #logBox{background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:10px;
           font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;
           max-height:62vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+  /* 附件小卡片（composer 待发区 和 消息气泡里都用） */
+  .files{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .fchip{position:relative;display:flex;gap:7px;align-items:center;font-size:12px;
+         background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+         padding:6px 10px;max-width:280px}
+  .fchip .ic{font-size:15px;line-height:1}
+  .fchip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fchip .sz{color:var(--dim);white-space:nowrap}
+  .fchip.warn{border-color:var(--warn)}
+  .fchip.bad{border-color:var(--err);color:var(--err)}
+  .fchip .rm{position:absolute;top:-6px;right:-6px;background:var(--err);color:#fff;border:0;
+             border-radius:50%;width:18px;height:18px;line-height:1;padding:0;font-size:12px}
+  .fchip .spin{width:10px;height:10px}
   .imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .imgs img{max-height:150px;border-radius:8px;border:1px solid var(--line)}
   .composer{border-top:1px solid var(--line);padding:14px 24px;background:var(--panel)}
@@ -113,6 +171,12 @@
   .item:hover .jx{border-color:var(--line)}
   .jx:hover{color:var(--err);border-color:var(--err);background:var(--panel2)}
   .st.running{color:var(--warn)} .st.succeeded{color:var(--ok)} .st.failed{color:var(--err)}
+  .fbk{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--warn);
+       color:var(--fg);padding:13px 15px;border-radius:10px;max-width:440px;display:none;z-index:100;
+       font-size:13px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+  .fbk .msg{color:var(--warn);margin-bottom:9px;white-space:pre-wrap}
+  .fbk .row2{display:flex;gap:8px;align-items:center}
+  .fbk select{flex:1;min-width:0}
   .toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--err);
          color:var(--fg);padding:11px 15px;border-radius:10px;max-width:420px;display:none;z-index:99;
          white-space:pre-wrap;font-size:13px}
@@ -136,6 +200,8 @@
     </div>
     <div class="convs">
       <h4>会话历史 <button style="float:right;padding:1px 8px;font-size:12px" onclick="newConv()">+ 新建</button></h4>
+      <input id="convSearch" placeholder="搜索标题或正文…"
+             style="margin-bottom:8px;font-size:12.5px;padding:6px 9px">
       <div id="convList"></div>
     </div>
   </aside>
@@ -154,6 +220,16 @@
     <div class="card" id="chatParams" style="display:none;margin:12px 24px 0">
       <div class="row">
         <div class="col">
+          <div class="field">
+            <label>提示词预设</label>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="presetSel" style="flex:1;min-width:140px"></select>
+              <button onclick="applyPreset()">应用</button>
+              <button onclick="savePreset()">另存为…</button>
+              <button onclick="delPreset()">删除</button>
+            </div>
+            <span class="hint" id="presetHint">把常用的系统提示词存下来，一键切换。</span>
+          </div>
           <div class="field"><label>系统提示词 System Prompt</label>
             <textarea id="sysPrompt" rows="3" placeholder="你是一个乐于助人的助手…"></textarea></div>
         </div>
@@ -180,9 +256,12 @@
       <div class="msgs" id="msgs"></div>
       <div class="composer">
         <div class="inner">
+          <div class="files" id="fileChips"></div>
           <div class="attach" id="attach"></div>
           <div class="cbox">
             <button onclick="pickImg()" title="上传图片">🖼</button>
+            <button onclick="pickDoc()" id="docBtn"
+                    title="上传文档：PDF / Word / PPT / Excel / txt / md / csv / 代码">📎</button>
             <textarea id="input" rows="1" placeholder="输入消息，Enter 发送 / Shift+Enter 换行"></textarea>
             <button class="primary" id="sendBtn" onclick="send()">发送</button>
             <button id="stopBtn" style="display:none" onclick="stopGen()">停止</button>
@@ -190,6 +269,7 @@
         </div>
       </div>
       <input type="file" id="fileInput" accept="image/*" multiple hidden />
+      <input type="file" id="docInput" multiple hidden />
     </div>
 
     <!-- ============ 图片 ============ -->
@@ -413,6 +493,14 @@
   </main>
 </div>
 <div class="toast" id="toast"></div>
+<div class="fbk" id="fbk">
+  <div class="msg" id="fbkMsg"></div>
+  <div class="row2">
+    <select id="fbkSel"></select>
+    <button class="primary" onclick="fbkGo()">换它重试</button>
+    <button onclick="fbkClose()">算了</button>
+  </div>
+</div>
 
 <!-- 目录选择器 -->
 <div id="fsMask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
@@ -457,12 +545,180 @@ async function copyText(text, label='已复制'){
   catch(e){ toast('复制失败，请手动选中：'+text, 8000); }
 }
 const esc = s => (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-function md(s){ // 极简 markdown：代码块 / 行内代码 / 粗体
-  return esc(s)
-    .replace(/```([\s\S]*?)```/g,(m,c)=>`<pre>${c.replace(/^\w*\n/,'')}</pre>`)
-    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
-    .replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
+/* ============ Markdown 渲染 ============
+   自己写而不引第三方库：这是个本地单文件前端，装不了构建工具，
+   而 marked+highlight+katex 全量 vendor 进来有好几 MB。
+   常用语法（标题/列表/表格/引用/代码/链接/强调）本地渲染；
+   LaTeX 和 mermaid 体量大，按需从 CDN 懒加载，没网就原样显示文本。 */
+const KEYWORDS = ('const|let|var|function|class|extends|return|if|else|for|while|break|continue|'
+  + 'new|this|typeof|instanceof|try|catch|finally|throw|await|async|yield|import|from|export|'
+  + 'default|def|lambda|None|True|False|elif|pass|raise|with|as|in|is|not|and|or|global|nonlocal|'
+  + 'self|print|null|true|false|undefined|public|private|static|void|int|float|str|bool|dict|list|'
+  + 'select|where|group|order|by|join|on|insert|update|delete|create|table|echo|cd|sudo|'
+  + 'struct|interface|type|package|func|defer|go|match|case|switch|fn|mut|use|impl|pub');
+/* 一次 replace 搞定：字符串/注释优先匹配，避免把字符串里的关键字也染色 */
+const HL_RE = new RegExp(
+  '("(?:[^"\\\\\\n]|\\\\.)*"|\'(?:[^\'\\\\\\n]|\\\\.)*\')'
+  + '|(#[^\\n]*|//[^\\n]*|/\\*[\\s\\S]*?\\*/|--[^\\n]*)'
+  + '|\\b(' + KEYWORDS + ')\\b'
+  + '|\\b(\\d+(?:\\.\\d+)?)\\b'
+  + '|([A-Za-z_$][\\w$]*)(?=\\()', 'g');
+function highlight(escaped){
+  return escaped.replace(HL_RE, (m, str, cmt, kw, num, fn) =>
+      str ? '<span class="hs">' + str + '</span>'
+    : cmt ? '<span class="hc">' + cmt + '</span>'
+    : kw  ? '<span class="hk">' + kw + '</span>'
+    : num ? '<span class="hn">' + num + '</span>'
+    :       '<span class="hf">' + fn + '</span>');
 }
+function inline(t){   // 行内元素：图片/链接/粗体/斜体/删除线/行内码
+  return t
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, '<img alt="$1" src="$2">')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g,
+             '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/~~([^~]+)~~/g, '<s>$1</s>');
+}
+const cellSplit = row => row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+function md(src){
+  const blocks = [];   // 代码块/公式块先抽出来占位，免得被后面的行级规则啃掉
+  let t = esc(src || '');
+  t = t.replace(/```(\w*)\n?([\s\S]*?)(?:```|$)/g, (m, lang, code) => {
+    blocks.push(lang.toLowerCase() === 'mermaid'
+      ? '<div class="mermaid">' + code.trim() + '</div>'
+      : '<div class="cb"><div class="cbh"><span>' + esc(lang || 'code') + '</span>'
+        + '<span class="sp"></span><button onclick="copyCode(this)">复制</button></div>'
+        + '<pre><code>' + highlight(code.replace(/\n$/, '')) + '</code></pre></div>');
+    return '\n@@BLK' + (blocks.length - 1) + '@@\n';
+  });
+  t = t.replace(/\$\$([\s\S]+?)\$\$/g, (m, tex) => {
+    blocks.push('<div class="mathblk" data-tex="' + encodeURIComponent(tex.trim()) + '">$$'
+                + tex + '$$</div>');
+    return '\n@@BLK' + (blocks.length - 1) + '@@\n';
+  });
+
+  const out = [];
+  const lines = t.split('\n');
+  const PH = /^@@BLK\d+@@$/;
+  let i = 0;
+  const flushList = (tag, items) =>
+    out.push('<' + tag + '>' + items.map(x => '<li>' + inline(x) + '</li>').join('') + '</' + tag + '>');
+  while(i < lines.length){
+    const ln = lines[i];
+    if(PH.test(ln.trim())){ out.push(ln.trim()); i++; continue; }
+    if(!ln.trim()){ i++; continue; }
+    let m;
+    if((m = ln.match(/^(#{1,6})\s+(.*)$/))){                       // 标题
+      const lv = Math.min(m[1].length, 4);
+      out.push('<h' + lv + '>' + inline(m[2]) + '</h' + lv + '>'); i++; continue;
+    }
+    if(/^(-{3,}|\*{3,}|_{3,})\s*$/.test(ln.trim())){ out.push('<hr>'); i++; continue; }
+    if(/^&gt;\s?/.test(ln)){                                       // 引用（esc 后 > 成了 &gt;）
+      const buf = [];
+      while(i < lines.length && /^&gt;\s?/.test(lines[i])){
+        buf.push(lines[i].replace(/^&gt;\s?/, '')); i++;
+      }
+      out.push('<blockquote>' + inline(buf.join('\n')) + '</blockquote>'); continue;
+    }
+    if(/^\s*\|.*\|\s*$/.test(ln) && /^\s*\|?[\s:|-]*\|[\s:|-]*$/.test(lines[i+1] || '')){  // 表格
+      const head = cellSplit(ln.trim()); i += 2;
+      const rows = [];
+      while(i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){
+        rows.push(cellSplit(lines[i].trim())); i++;
+      }
+      out.push('<table><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('')
+        + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table>');
+      continue;
+    }
+    if(/^\s*[-*+]\s+/.test(ln)){                                   // 无序列表
+      const items = [];
+      while(i < lines.length && /^\s*[-*+]\s+/.test(lines[i])){
+        items.push(lines[i].replace(/^\s*[-*+]\s+/, '')); i++;
+      }
+      flushList('ul', items); continue;
+    }
+    if(/^\s*\d+[.)]\s+/.test(ln)){                                 // 有序列表
+      const items = [];
+      while(i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])){
+        items.push(lines[i].replace(/^\s*\d+[.)]\s+/, '')); i++;
+      }
+      flushList('ol', items); continue;
+    }
+    const para = [];                                               // 普通段落
+    while(i < lines.length && lines[i].trim()
+          && !PH.test(lines[i].trim())
+          && !/^(#{1,6}\s|&gt;\s?|\s*[-*+]\s|\s*\d+[.)]\s)/.test(lines[i])
+          && !/^\s*\|.*\|\s*$/.test(lines[i])){ para.push(lines[i]); i++; }
+    if(para.length) out.push('<p>' + inline(para.join('\n')) + '</p>');
+    else i++;
+  }
+  return out.join('').replace(/@@BLK(\d+)@@/g, (m, n) => blocks[+n]);
+}
+function copyCode(btn){
+  const code = btn.closest('.cb').querySelector('code');
+  navigator.clipboard.writeText(code.innerText).then(
+    () => { btn.textContent = '已复制'; setTimeout(() => btn.textContent = '复制', 1500); },
+    () => toast('复制失败，请手动选中'));
+}
+
+/* LaTeX / mermaid：用到了才去 CDN 取，取不到就把原文留着 */
+const LIBS = {katex: null, mermaid: null};
+function loadOnce(key, urls){
+  if(LIBS[key]) return LIBS[key];
+  LIBS[key] = new Promise((res, rej) => {
+    urls.filter(u => u.endsWith('.css')).forEach(u => {
+      const l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = u; document.head.appendChild(l);
+    });
+    const sc = document.createElement('script');
+    sc.src = urls.find(u => u.endsWith('.js'));
+    sc.onload = res;
+    sc.onerror = () => { LIBS[key] = null; rej(new Error('加载失败')); };
+    document.head.appendChild(sc);
+  });
+  return LIBS[key];
+}
+let libWarned = false;
+async function renderExtras(root){
+  const maths = [...root.querySelectorAll('.mathblk:not([data-done])')];
+  const mers  = [...root.querySelectorAll('.mermaid:not([data-done])')];
+  if(!maths.length && !mers.length) return;
+  try{
+    if(maths.length){
+      await loadOnce('katex', ['https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
+                               'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js']);
+      maths.forEach(el => {
+        el.dataset.done = '1';
+        try{
+          katex.render(decodeURIComponent(el.dataset.tex), el,
+                       {displayMode: true, throwOnError: false});
+        }catch(e){}
+      });
+    }
+    if(mers.length){
+      await loadOnce('mermaid', ['https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js']);
+      mermaid.initialize({startOnLoad: false, theme: 'dark'});
+      for(const el of mers){
+        el.dataset.done = '1';
+        try{
+          const id = 'm' + Math.random().toString(36).slice(2);
+          const {svg} = await mermaid.render(id, el.textContent);
+          el.innerHTML = svg;
+        }catch(e){ el.dataset.done = ''; }
+      }
+    }
+  }catch(e){
+    if(!libWarned){
+      libWarned = true;
+      toast('公式/图表需要联网加载渲染库（katex/mermaid），当前取不到，已按纯文本显示', 8000);
+    }
+  }
+}
+
 
 /* ---------- 页签 ---------- */
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
@@ -496,6 +752,7 @@ async function loadModels(){
         o.value = p.id+'/'+m.id; o.textContent = m.name || m.id;
         o.dataset.vision = m.vision?'1':'';
         o.dataset.imageInput = m.image_input?'1':'';
+        o.dataset.maxImages = m.max_images || '';
         if(m.sizes && m.sizes.length) o.dataset.sizes = JSON.stringify(m.sizes);
         g.appendChild(o);
       });
@@ -557,6 +814,55 @@ async function loadContext(){
   $('#injTimeNow').title = d.note;
 }
 
+/* ---------- 限流后换模型重试 ---------- */
+const isBusyErr = m => /429|限流|rate.?limit|too many requests|超时|timeout|502|503|504/i.test(m||'');
+/* 备选模型：同能力、别的服务商、已配 key；按和当前模型名字的相似度排前面 */
+function fallbackModels(cap, current){
+  const [curPid, ...rest] = (current||'').split('/');
+  const curId = rest.join('/').toLowerCase();
+  const words = curId.split(/[^a-z0-9.]+/).filter(w=>w.length>2);
+  const out = [];
+  (CFG.providers||[]).forEach(p=>{
+    if(p.id===curPid || !p.has_key) return;
+    (p[cap]||[]).forEach(m=>{
+      const id = String(m.id).toLowerCase();
+      out.push({ref:p.id+'/'+m.id, label:`${m.name||m.id} · ${p.name}`,
+                score: words.filter(w=>id.includes(w)).length});
+    });
+  });
+  return out.sort((a,b)=>b.score-a.score);
+}
+/* 能看图的对话模型（含当前服务商，只要配了 key） */
+function visionModels(){
+  const cur = ($('#chatModel').value||'').split('/')[0];
+  const out = [];
+  (CFG.providers||[]).forEach(p=>{
+    if(!p.has_key) return;
+    const local = /localhost|127\.0\.0\.1/.test(p.base_url||'');
+    (p.chat||[]).forEach(m=>{ if(m.vision) out.push({ref:p.id+'/'+m.id,
+      label:`${m.name||m.id} · ${p.name}`,
+      // 同一家排最前（key 和额度都是现成的），本地服务排最后（多半没起）
+      rank: (p.id===cur ? 0 : 1) + (local ? 2 : 0)}); });
+  });
+  return out.sort((a,b)=>a.rank-b.rank);
+}
+let fbkPick = null;
+function offerFallback(cap, current, err, onPick, list){
+  list = list || fallbackModels(cap, current);
+  if(!list.length) return false;           // 没有备选就别弹了，老老实实报错
+  fbkPick = onPick;
+  $('#fbkSel').innerHTML = list.map(x=>`<option value="${x.ref}">${esc(x.label)}</option>`).join('');
+  $('#fbkMsg').textContent = `${err}\n\n要换个模型重试吗？`;
+  $('#fbk').style.display = 'block';
+  return true;
+}
+function fbkClose(){ $('#fbk').style.display='none'; fbkPick=null; }
+function fbkGo(){
+  const ref = $('#fbkSel').value, fn = fbkPick;
+  fbkClose();
+  if(fn) fn(ref);
+}
+
 /* ---------- 工具 ---------- */
 async function loadTools(){
   TOOLS = (await (await fetch('/api/tools')).json()).items || [];
@@ -571,6 +877,49 @@ async function loadTools(){
   });
 }
 
+/* ---------- 提示词预设 ---------- */
+let PRESETS = [];
+async function loadPresets(){
+  PRESETS = (await (await fetch('/api/presets')).json()).items || [];
+  const sel = $('#presetSel'), prev = sel.value;
+  sel.innerHTML = '<option value="">（不使用预设）</option>'
+    + PRESETS.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if(prev && PRESETS.some(p=>p.id===prev)) sel.value = prev;
+  $('#presetHint').textContent = PRESETS.length
+    ? `共 ${PRESETS.length} 个预设，选中后点「应用」写入系统提示词。`
+    : '还没有预设。先写好系统提示词，再点「另存为…」。';
+}
+function applyPreset(){
+  const p = PRESETS.find(x=>x.id===$('#presetSel').value);
+  if(!p) return toast('先选一个预设');
+  $('#sysPrompt').value = p.content;
+  if(p.params && p.params.temperature !== undefined){
+    $('#temp').value = p.params.temperature; $('#tLbl').textContent = p.params.temperature;
+  }
+  ok('已应用预设：'+p.name, 3000);
+}
+async function savePreset(){
+  const content = $('#sysPrompt').value.trim();
+  if(!content) return toast('系统提示词是空的，先写点内容');
+  const cur = PRESETS.find(x=>x.id===$('#presetSel').value);
+  const name = prompt('预设名称（同名会覆盖）', cur ? cur.name : '');
+  if(!name) return;
+  const r = await fetch('/api/presets', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, content, params:{temperature:parseFloat($('#temp').value)}})});
+  if(!r.ok) return toast('保存失败：'+((await r.json()).detail||r.statusText));
+  const p = await r.json();
+  await loadPresets(); $('#presetSel').value = p.id;
+  ok('预设已保存：'+p.name, 3000);
+}
+async function delPreset(){
+  const p = PRESETS.find(x=>x.id===$('#presetSel').value);
+  if(!p) return toast('先选一个预设');
+  if(!confirm(`删除预设「${p.name}」？`)) return;
+  await fetch('/api/presets/'+p.id, {method:'DELETE'});
+  await loadPresets(); ok('已删除预设：'+p.name, 3000);
+}
+
 /* 把 config.yaml 里的 defaults 应用到三个选择器 */
 function applyDefaults(){
   const d = CFG.defaults||{};
@@ -583,17 +932,39 @@ function applyDefaults(){
 $('#chatModel').onchange = updHint;
 function updHint(){
   const o = $('#chatModel').selectedOptions[0];
-  $('#chatHint').textContent = o ? (o.dataset.vision ? '该模型支持图片输入' : '纯文本模型') : '';
+  const el = $('#chatHint');
+  if(!o){ el.textContent = ''; return; }
+  const vis = !!o.dataset.vision;
+  el.textContent = vis ? '🖼 支持图片输入' : '纯文本模型（不能看图，📎 文档可用）';
+  el.style.color = vis ? 'var(--ok)' : 'var(--dim)';
 }
 
 /* ---------- 会话 ---------- */
+let convQ = '';
+$('#convSearch').addEventListener('input', function(){
+  clearTimeout(this._t);
+  this._t = setTimeout(()=>{ convQ = this.value.trim(); loadConvs(); }, 250);
+});
 async function loadConvs(){
-  const {items} = await (await fetch('/api/conversations')).json();
+  const url = '/api/conversations' + (convQ ? '?q=' + encodeURIComponent(convQ) : '');
+  const {items} = await (await fetch(url)).json();
   $('#convList').innerHTML = items.map(c=>`
-    <div class="conv ${c.id===convId?'on':''}" onclick="openConv('${c.id}')">
+    <div class="conv ${c.id===convId?'on':''}" onclick="openConv('${c.id}')"
+         title="${esc(c.hit||c.title)}">
       <span style="overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</span>
-      <span class="x" onclick="event.stopPropagation();delConv('${c.id}')">✕</span>
-    </div>`).join('') || '<div class="hint" style="padding:6px">暂无会话</div>';
+      <span class="x" title="重命名"
+            onclick="event.stopPropagation();renameConv('${c.id}','${esc(c.title).replace(/'/g,"&#39;")}')">✎</span>
+      <span class="x" title="删除" onclick="event.stopPropagation();delConv('${c.id}')">✕</span>
+    </div>`).join('')
+    || `<div class="hint" style="padding:6px">${convQ?'没搜到匹配的会话':'暂无会话'}</div>`;
+}
+async function renameConv(id, old){
+  const title = prompt('会话名称', old);
+  if(title===null) return;
+  const r = await fetch('/api/conversations/'+id, {method:'PATCH',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({title})});
+  if(!r.ok) return toast('改名失败：'+((await r.json()).detail||r.statusText));
+  await loadConvs();
 }
 function newConv(){ convId=null; $('#msgs').innerHTML=''; applyDefaults(); loadConvs(); }
 async function delConv(id){ await fetch('/api/conversations/'+id,{method:'DELETE'});
@@ -601,30 +972,110 @@ async function delConv(id){ await fetch('/api/conversations/'+id,{method:'DELETE
 async function openConv(id){
   const c = await (await fetch('/api/conversations/'+id)).json();
   convId = id; $('#msgs').innerHTML='';
-  c.messages.forEach(m=>addMsg(m.role, m.content, m.images, m.reasoning, m.tools));
+  c.messages.forEach(m=>addMsg(m.role, m.content, m.images, m.reasoning, m.tools,
+                                m.id, m.attachments));
   if(c.system_prompt) $('#sysPrompt').value = c.system_prompt;
   if(c.model) $('#chatModel').value = c.model;
   loadConvs();
 }
 
 /* ---------- 消息渲染 ---------- */
-function addMsg(role, text, images, reasoning, tools){
+function addMsg(role, text, images, reasoning, tools, mid, atts){
   const wrap = document.createElement('div');
   wrap.className = 'msg '+role;
+  wrap.dataset.mid = mid || '';
+  wrap.dataset.raw = text || '';          // 原始 markdown，复制/编辑用
+  wrap._imgs = images || [];
+  wrap._atts = atts || [];
   const tls = (tools||[]).map(t=>`<div class="t">🔧 ${esc(t)}</div>`).join('');
+  const acts = role==='user'
+    ? `<button onclick="copyMsg(this)">复制</button>
+       <button onclick="editMsg(this)">编辑重发</button>
+       <button class="danger" onclick="delMsg(this)">删除</button>`
+    : `<button onclick="copyMsg(this)">复制</button>
+       <button onclick="regenMsg(this)">重新生成</button>
+       <button class="danger" onclick="delMsg(this)">删除</button>`;
   wrap.innerHTML = `<div class="ava">${role==='user'?'我':'AI'}</div>
     <div class="bubble"><div class="who">${role==='user'?'你':'助手'}</div>
       <div class="tools"${tls?'':' style="display:none"'}>${tls}</div>
       ${reasoning?`<div class="think">${esc(reasoning)}</div>`:'<div class="think" style="display:none"></div>'}
+      <div class="files">${fileChipsHtml(atts)}</div>
       <div class="body">${md(text)}</div>
-      <div class="imgs">${(images||[]).map(u=>`<img src="${u}">`).join('')}</div></div>`;
+      <div class="imgs">${(images||[]).map(u=>`<img src="${u}">`).join('')}</div>
+      <div class="acts">${acts}</div></div>`;
   $('#msgs').appendChild(wrap);
+  renderExtras(wrap);
   $('#msgs').scrollTop = $('#msgs').scrollHeight;
   return wrap;
+}
+const msgOf = el => el.closest('.msg');
+function copyMsg(btn){ copyText(msgOf(btn).dataset.raw || '', '已复制消息'); }
+
+async function delMsg(btn){
+  const node = msgOf(btn), mid = node.dataset.mid;
+  if(!confirm('删除这条消息？（只删这一条，不影响其它消息）')) return;
+  if(mid){
+    const r = await fetch('/api/messages/'+mid, {method:'DELETE'});
+    if(!r.ok) return toast('删除失败：'+((await r.json()).detail||r.statusText));
+  }
+  node.remove(); loadConvs();
+}
+
+/* 编辑：把正文换成输入框，保存后按新内容重跑这一轮 */
+function editMsg(btn){
+  const node = msgOf(btn), body = node.querySelector('.body');
+  if(node.querySelector('.editbox')) return;
+  const raw = node.dataset.raw || '';
+  body.innerHTML = `<div class="editbox">
+      <textarea class="ed">${esc(raw)}</textarea>
+      <div style="display:flex;gap:8px">
+        <button class="primary" onclick="editSave(this)">保存并重发</button>
+        <button onclick="editCancel(this)">取消</button>
+      </div></div>`;
+  body.querySelector('.ed').focus();
+}
+function editCancel(btn){
+  const node = msgOf(btn);
+  node.querySelector('.body').innerHTML = md(node.dataset.raw || '');
+  renderExtras(node);
+}
+function editSave(btn){
+  const node = msgOf(btn);
+  const text = node.querySelector('.ed').value.trim();
+  if(!text) return toast('内容不能为空');
+  resendFrom(node, text);
+}
+/* 重新生成：从这条 assistant 往上找到对应的用户消息，按原内容重跑 */
+function regenMsg(btn){
+  const node = msgOf(btn);
+  let u = node.previousElementSibling;
+  while(u && !u.classList.contains('user')) u = u.previousElementSibling;
+  if(!u) return toast('找不到对应的用户消息，无法重新生成');
+  resendFrom(u, u.dataset.raw || '');
+}
+/* 从某条用户消息开始重跑：先把它和它之后的都清掉（否则模型会被旧回答带偏），再重发 */
+async function resendFrom(userNode, text){
+  if(ctrl) return toast('正在生成中，先点「停止」');
+  const mid = userNode.dataset.mid;
+  if(mid){
+    const r = await fetch('/api/messages/'+mid+'?following=true', {method:'DELETE'});
+    if(!r.ok) return toast('清理旧消息失败：'+((await r.json()).detail||r.statusText));
+  }
+  const imgs = userNode._imgs || [];
+  const docs = userNode._docs || [];   // 库里存的附件没带正文，只能用本轮内存里的
+  let n = userNode;
+  while(n){ const next = n.nextElementSibling; n.remove(); n = next; }
+  if((userNode._atts||[]).length && !docs.length)
+    toast('这条消息的附件正文没在本次会话中缓存，重发时不会带上附件，必要请重新上传', 9000);
+  send(text, imgs, docs);
 }
 
 /* ---------- 图片附件 ---------- */
 const pickImg = () => $('#fileInput').click();
+const canSeeImages = () => {
+  const o = $('#chatModel').selectedOptions[0];
+  return !!(o && o.dataset.vision);
+};
 $('#fileInput').onchange = e => {
   [...e.target.files].forEach(f=>{
     const r = new FileReader();
@@ -632,10 +1083,78 @@ $('#fileInput').onchange = e => {
     r.readAsDataURL(f);
   });
   e.target.value='';
+  // 纯文本模型收到图片会静默忽略，然后回你"我没看到图片"——所以这里就得说清楚
+  if(!canSeeImages()){
+    const vis = visionModels();
+    toast('当前模型不支持看图，发送前需要换成视觉模型'
+      + (vis.length ? '（如 '+vis[0].label+'）' : '：config.yaml 里给能看图的模型加 vision: true'),
+      9000);
+  }
 };
 function renderAttach(){
   $('#attach').innerHTML = pending.map((u,i)=>
     `<div class="t"><img src="${u}"><button class="rm" onclick="pending.splice(${i},1);renderAttach()">✕</button></div>`).join('');
+}
+
+/* ---------- 文档附件 ---------- */
+let pendingDocs = [];          // 已解析好的附件（含正文，发送时一起带上）
+let ATT = null;                // 后端给的格式与大小限制
+const FICON = {pdf:'📕', docx:'📘', pptx:'📙', xlsx:'📗', xlsm:'📗',
+               md:'📝', txt:'📄', csv:'📊', json:'🧾'};
+const ficon = e => FICON[e] || '📄';
+const kchars = n => n >= 1000 ? (n/1000).toFixed(1)+'k字' : n+'字';
+
+async function loadAttInfo(){
+  try{
+    ATT = await (await fetch('/api/attachments/info')).json();
+    $('#docInput').accept = [...ATT.doc_ext, ...ATT.text_ext].map(e=>'.'+e).join(',');
+    $('#docBtn').title = `上传文档（≤${ATT.max_mb}MB）：`
+      + ATT.doc_ext.map(e=>e.toUpperCase()).join(' / ') + ' 及 txt/md/csv/代码等';
+  }catch(e){ /* 拿不到就用默认 accept，不影响使用 */ }
+}
+const pickDoc = () => $('#docInput').click();
+$('#docInput').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if(!files.length) return;
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f));
+  // 先放占位卡片，解析大 PDF 要几秒
+  const holder = files.map(f => ({name:f.name, ext:f.name.split('.').pop().toLowerCase(),
+                                 loading:true}));
+  pendingDocs.push(...holder);
+  renderFileChips();
+  try{
+    const r = await fetch('/api/attachments', {method:'POST', body: fd});
+    if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const {items, errors} = await r.json();
+    pendingDocs = pendingDocs.filter(x => !x.loading).concat(items);
+    (errors||[]).forEach(x => toast(`${x.name}：${x.error}`, 12000));
+  }catch(err){
+    pendingDocs = pendingDocs.filter(x => !x.loading);
+    toast('附件解析失败：'+err.message, 10000);
+  }
+  renderFileChips();
+};
+function renderFileChips(){
+  $('#fileChips').innerHTML = pendingDocs.map((f,i)=>{
+    if(f.loading) return `<div class="fchip"><span class="spin"></span>
+        <span class="nm">${esc(f.name)}</span><span class="sz">解析中…</span></div>`;
+    const meta = Object.entries(f.meta||{}).map(([k,v])=>k+' '+v).join('，');
+    return `<div class="fchip ${f.truncated?'warn':''}" title="${esc(meta)}${f.truncated?'（已截断）':''}">
+      <span class="ic">${ficon(f.ext)}</span>
+      <span class="nm">${esc(f.name)}</span>
+      <span class="sz">${kchars(f.chars)}${f.truncated?' ⚠截断':''}</span>
+      <button class="rm" onclick="pendingDocs.splice(${i},1);renderFileChips()">✕</button></div>`;
+  }).join('');
+}
+/* 消息气泡里的附件（只有元信息，没正文） */
+function fileChipsHtml(atts){
+  return (atts||[]).map(f=>{
+    const meta = Object.entries(f.meta||{}).map(([k,v])=>k+' '+v).join('，');
+    return `<div class="fchip ${f.truncated?'warn':''}" title="${esc(meta)}">
+      <span class="ic">${ficon(f.ext)}</span><span class="nm">${esc(f.name)}</span>
+      <span class="sz">${kchars(f.chars||0)}${f.truncated?' ⚠截断':''}</span></div>`;
+  }).join('');
 }
 
 /* ---------- 发送 ---------- */
@@ -644,15 +1163,34 @@ $('#input').addEventListener('keydown', e=>{
 });
 function stopGen(){ if(ctrl) ctrl.abort(); }
 
-async function send(){
-  const text = $('#input').value.trim();
-  if(!text && !pending.length) return;
+async function send(overrideText, overrideImgs, overrideDocs){
+  const resend = overrideText !== undefined;
+  const text = resend ? overrideText : $('#input').value.trim();
+  const docs = resend ? (overrideDocs||[]) : pendingDocs.filter(f=>!f.loading);
+  if(!text && !(resend ? (overrideImgs||[]).length : pending.length) && !docs.length) return;
+  if(!resend && pendingDocs.some(f=>f.loading)) return toast('附件还在解析中，稍等一下');
   const model = $('#chatModel').value;
   if(!model) return toast('请先选择对话模型');
 
-  addMsg('user', text, pending);
-  const imgs = pending.slice(); pending = []; renderAttach();
-  $('#input').value=''; $('#input').style.height='auto';
+  const imgs = resend ? (overrideImgs||[]) : pending.slice();
+  if(imgs.length && !canSeeImages()){
+    // 不能悄悄发出去：纯文本模型会忽略图片，然后一本正经地说"没看到图片"
+    const vis = visionModels();
+    const msg = `当前模型「${$('#chatModel').selectedOptions[0].textContent}」不支持图片输入，`
+      + `发出去图会被忽略。`;
+    const offered = offerFallback('chat', model, msg, ref=>{
+      $('#chatModel').value = ref; updHint();
+      send(resend ? overrideText : undefined, resend ? overrideImgs : undefined,
+           resend ? overrideDocs : undefined);
+    }, vis.map(v=>({...v, score:0})));
+    if(!offered) toast(msg + ' 而且没有可用的视觉模型：先在 config.yaml 里给支持看图的'
+                       + '模型加 vision: true，并确认那家的 API Key 已配置。', 12000);
+    return;                       // 图片留在待发区，换完模型可以直接再发
+  }
+  const userNode = addMsg('user', text, imgs, '', [], '', docs);
+  userNode._docs = docs;              // 重发时要原样带上（含正文）
+  if(!resend){ pending = []; renderAttach(); pendingDocs = []; renderFileChips();
+    $('#input').value=''; $('#input').style.height='auto'; }
 
   const node = addMsg('assistant','');
   const bodyEl = node.querySelector('.body');
@@ -673,6 +1211,7 @@ async function send(){
     const resp = await fetch('/api/chat', {
       method:'POST', headers:{'Content-Type':'application/json'}, signal: ctrl.signal,
       body: JSON.stringify({conversation_id:convId, model, message:text, images:imgs,
+                            attachments:docs,
                             system_prompt:$('#sysPrompt').value, params,
                             tools:[...activeTools]})
     });
@@ -686,10 +1225,12 @@ async function send(){
       for(const part of parts){
         const line = part.trim(); if(!line.startsWith('data:')) continue;
         const ev = JSON.parse(line.slice(5));
-        if(ev.type==='start'){ convId = ev.conversation_id; }
+        if(ev.type==='start'){ convId = ev.conversation_id;
+          if(ev.user_message_id) userNode.dataset.mid = ev.user_message_id; }
         else if(ev.type==='reasoning'){ think += ev.text; thinkEl.style.display='block';
           thinkEl.textContent = '💭 ' + think; }
-        else if(ev.type==='delta'){ acc += ev.text; bodyEl.innerHTML = md(acc); }
+        else if(ev.type==='delta'){ acc += ev.text; bodyEl.innerHTML = md(acc);
+          node.dataset.raw = acc; }
         else if(ev.type==='tool_call'){
           toolsEl.style.display='flex';
           const line = document.createElement('div');
@@ -707,8 +1248,15 @@ async function send(){
           line.innerHTML = `🔧 ${esc(ev.summary||'')}`;
         }
         else if(ev.type==='error'){ toast('生成失败：'+ev.message);
-          bodyEl.innerHTML = `<span style="color:var(--err)">⚠ ${esc(ev.message)}</span>`; }
-        else if(ev.type==='end'){ convId = ev.conversation_id || convId; }
+          bodyEl.innerHTML = `<span style="color:var(--err)">⚠ ${esc(ev.message)}</span>`;
+          if(isBusyErr(ev.message))
+            offerFallback('chat', model, ev.message, ref=>{
+              $('#chatModel').value = ref; updHint();
+              node.remove(); resendFrom(userNode, text);
+            }); }
+        else if(ev.type==='end'){ convId = ev.conversation_id || convId;
+          if(ev.message_id) node.dataset.mid = ev.message_id;
+          if(ev.user_message_id) userNode.dataset.mid = ev.user_message_id; }
         $('#msgs').scrollTop = $('#msgs').scrollHeight;
       }
     }
@@ -718,6 +1266,14 @@ async function send(){
   }finally{
     ctrl=null; $('#sendBtn').disabled=false; $('#stopBtn').style.display='none';
     if(!acc && !bodyEl.textContent.trim()) bodyEl.textContent='(无内容)';
+    node.dataset.raw = acc || node.dataset.raw || '';
+    renderExtras(node);
+    // 中断时后端会把已生成的部分存下来，这里回读一次，拿到它的消息 id
+    if(!node.dataset.mid && convId && acc){
+      const c = await (await fetch('/api/conversations/'+convId)).json();
+      const last = (c.messages||[]).slice(-1)[0];
+      if(last && last.role==='assistant') node.dataset.mid = last.id;
+    }
     loadConvs();
   }
 }
@@ -725,8 +1281,19 @@ $('#input').addEventListener('input', function(){ this.style.height='auto';
   this.style.height = Math.min(this.scrollHeight, 220)+'px'; });
 
 /* ---------- 图片生成 ---------- */
+function maxRefs(){                        // 0 = 未配上限
+  const o = $('#imgModel').selectedOptions[0];
+  return parseInt(o && o.dataset.maxImages) || 0;
+}
 $('#imgRef').onchange = e => {
-  [...e.target.files].forEach(f=>{
+  const cap = maxRefs(), picked = [...e.target.files];
+  let room = cap ? cap - imgRefs.length : picked.length;
+  if(cap && picked.length > room){
+    toast(room > 0
+      ? `该模型最多支持 ${cap} 张参考图，只取前 ${room} 张`
+      : `已经选满 ${cap} 张参考图，先删掉几张再加`);
+  }
+  picked.slice(0, Math.max(room, 0)).forEach(f=>{
     const r = new FileReader();
     r.onload = () => { imgRefs.push(r.result); renderRefs(); };
     r.readAsDataURL(f);
@@ -762,13 +1329,24 @@ function fillSizes(){
   $('#imgSizeHint').textContent = o && o.dataset.sizes
     ? '该模型官方支持的尺寸' : '通用尺寸（该模型未在 config.yaml 里配 sizes）';
 }
-$('#imgModel').onchange = () => { fillSizes(); updImgHint(); };
+$('#imgModel').onchange = () => {
+  const cap = maxRefs();
+  if(cap && imgRefs.length > cap){
+    const drop = imgRefs.length - cap;
+    imgRefs = imgRefs.slice(0, cap);
+    toast(`该模型最多支持 ${cap} 张参考图，已移除多出的 ${drop} 张`);
+    renderRefs();
+  }
+  fillSizes(); updImgHint();
+};
 function updImgHint(){
   const o = $('#imgModel').selectedOptions[0];
   if(!imgRefs.length){ $('#imgRefHint').textContent =
       '不传参考图即为文生图；传了就走图生图/图片编辑。'; return; }
+  const cap = maxRefs();
   $('#imgRefHint').innerHTML = o && o.dataset.imageInput
     ? `已选 ${imgRefs.length} 张参考图，将走图生图。`
+      + (cap ? `该模型最多 ${cap} 张${imgRefs.length >= cap ? '（已选满）' : ''}。` : '')
     : `已选 ${imgRefs.length} 张参考图，但该模型在 config.yaml 里没标记 <code>image_input: true</code>，`
       + `如果服务商不支持会直接报错。`;
 }
@@ -784,17 +1362,45 @@ async function genImage(){
   const tick = setInterval(()=>{ btn.textContent = `生成中… ${Math.round((Date.now()-t0)/1000)}s`; }, 500);
   btn.textContent='生成中… 0s';
   try{
+    // 提交后立刻拿到 job，随后轮询——这样关掉页面/网络抖动都不会把任务弄丢
     const r = await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model, prompt, params})});
     if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
     const job = await r.json();
-    const secs = ((Date.now()-t0)/1000).toFixed(0);
-    const n = (job.result||[]).length;
-    if(n) ok(`✅ 生成成功：${n} 张，用时 ${secs}s，已保存到 ${DIRS.image_abs||'本地'}`, 8000);
-    else  toast('接口返回成功但没有图片，请看日志', 8000);
     await loadJobs('image');
+    await watchJob(job.id, 'image', t0);
   }catch(e){ toast('出图失败：'+e.message, 10000); }
   finally{ clearInterval(tick); btn.disabled=false; btn.textContent='生成图片'; }
+}
+
+/* 轮询一个生成任务直到出结果；页面刷新/关掉也不影响后台，回来看列表就行 */
+async function watchJob(jid, kind, t0){
+  const started = t0 || Date.now();
+  while(true){
+    await new Promise(r=>setTimeout(r, 2000));
+    let j;
+    try{ j = await (await fetch('/api/jobs/'+jid)).json(); }
+    catch(e){ continue; }        // 网络抖一下不算失败，接着轮
+    if(j.status==='succeeded' || j.status==='failed'){
+      await loadJobs(kind);
+      const secs = ((Date.now()-started)/1000).toFixed(0);
+      const n = (j.result||[]).length;
+      const what = kind==='image' ? '张图片' : '个视频';
+      const dir = kind==='image' ? DIRS.image_abs : DIRS.video_abs;
+      if(j.status==='failed'){
+        toast(`生成失败（用时 ${secs}s）：${j.error||'原因见日志'}`, 12000);
+        if(isBusyErr(j.error))
+          offerFallback(kind, j.provider+'/'+j.model, j.error, ref=>{
+            $(kind==='image'?'#imgModel':'#vidModel').value = ref;
+            if(kind==='image'){ fillSizes(); updImgHint(); genImage(); } else genVideo();
+          });
+      }
+      else if(n) ok(`✅ 生成成功：${n} ${what}，用时 ${secs}s，已保存到 ${dir||'本地'}`, 8000);
+      else toast('任务成功但没有结果文件，请看日志', 8000);
+      return j;
+    }
+    if(kind==='image') await loadJobs(kind);   // 列表里能看到「生成中」的卡片
+  }
 }
 
 /* ---------- 视频生成 ---------- */
@@ -818,8 +1424,10 @@ async function genVideo(){
     const r = await fetch('/api/video',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model, prompt, params})});
     if(!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const job = await r.json();
     ok('任务已提交，正在后台生成，完成后会自动出现在下方列表', 6000);
     await loadJobs('video');
+    watchJob(job.id, 'video', Date.now());   // 不 await：视频要几分钟，按钮先放开
   }catch(e){ toast('提交失败：'+e.message); }
   finally{ btn.disabled=false; btn.textContent='生成视频'; }
 }
@@ -1045,7 +1653,8 @@ function fsPick(){
   $('#fsMask').style.display='none';
 }
 
-loadModels(); loadConvs(); loadDirs(); loadTools(); loadContext(); loadCos(); updImgHint();
+loadModels(); loadConvs(); loadDirs(); loadTools(); loadPresets(); loadAttInfo();
+loadContext(); loadCos(); updImgHint();
 </script>
 </body>
 </html>

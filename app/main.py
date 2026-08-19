@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Any, Optional
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import context as ctx
+from . import documents as docs
 from . import cos
 from . import logctx
 from . import providers, storage
@@ -30,7 +31,8 @@ from .config import (MEDIA_DIR, ROOT, defaults_raw, find_model_meta, load_config
                      patch_section, raw_config_text, resolve_dir, save_config,
                      set_defaults, set_storage_dirs, storage_dirs, storage_raw)
 from .logging_setup import preview, setup as setup_logging
-from .providers.base import ProviderError, is_data_url, ref_images, split_data_url
+from .providers.base import (ProviderError, is_data_url, limit_refs,
+                            ref_images, split_data_url)
 
 LOG_FILE = setup_logging()
 log = logging.getLogger("aihub")
@@ -172,6 +174,7 @@ class ChatReq(BaseModel):
     system_prompt: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
     tools: list[str] = Field(default_factory=list)
+    attachments: list[dict[str, Any]] = Field(default_factory=list)
     save: bool = True
 
 
@@ -190,6 +193,17 @@ class VideoReq(BaseModel):
 class ConvReq(BaseModel):
     model: str = ""
     system_prompt: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConvPatchReq(BaseModel):
+    title: Optional[str] = None
+
+
+class PresetReq(BaseModel):
+    id: str = ""
+    name: str
+    content: str = ""
     params: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -370,7 +384,10 @@ def api_mkdir(req: MkdirReq) -> dict:
 
 # ============================ 会话 ============================
 @app.get("/api/conversations")
-def api_list_conv() -> dict:
+def api_list_conv(q: Optional[str] = None) -> dict:
+    """q 非空则按标题+正文搜索，返回项里多一个 hit 字段（命中的消息片段）。"""
+    if q and q.strip():
+        return {"items": storage.search_conversations(q.strip()), "q": q.strip()}
     return {"items": storage.list_conversations()}
 
 
@@ -384,12 +401,93 @@ def api_get_conv(cid: str) -> dict:
     conv = storage.get_conversation(cid)
     if not conv:
         raise HTTPException(404, "会话不存在")
+    for m in conv["messages"]:      # 附件正文留在库里给模型用，前端只要文件名和字数
+        m["attachments"] = docs.strip_text(m.get("attachments") or [])
     return conv
+
+
+@app.patch("/api/conversations/{cid}")
+def api_patch_conv(cid: str, req: ConvPatchReq) -> dict:
+    if not storage.get_conversation(cid):
+        raise HTTPException(404, "会话不存在")
+    if req.title is not None:
+        title = req.title.strip()[:80]
+        if not title:
+            raise HTTPException(400, "标题不能为空")
+        storage.update_conversation(cid, title=title)
+        log.info("会话改名 conv=%s → %s", cid, title)
+    return storage.get_conversation(cid)
 
 
 @app.delete("/api/conversations/{cid}")
 def api_del_conv(cid: str) -> dict:
     storage.delete_conversation(cid)
+    return {"ok": True}
+
+
+@app.delete("/api/messages/{mid}")
+def api_del_message(mid: str, following: bool = False) -> dict:
+    """删一条消息。following=true 连它之后的一起删（重发/重新生成用）。"""
+    msg = storage.get_message(mid)
+    if not msg:
+        raise HTTPException(404, "消息不存在")
+    n = storage.delete_message(mid, with_following=following)
+    log.info("删除消息 conv=%s msg=%s 连带后续=%s 共%d条",
+             msg["conversation_id"], mid, following, n)
+    return {"ok": True, "deleted": n}
+
+
+# ============================ 附件解析 ============================
+@app.get("/api/attachments/info")
+def api_att_info() -> dict:
+    """前端用它决定 file input 的 accept 和大小提示。"""
+    lim = docs.limits()
+    return {"doc_ext": sorted(docs.DOC_EXT), "text_ext": sorted(docs.TEXT_EXT), **lim}
+
+
+@app.post("/api/attachments")
+async def api_attachments(files: list[UploadFile] = File(...)) -> dict:
+    """解析上传的文档，返回抽出的文本。
+
+    只做解析，不落盘——文本随对话一起存进消息里，文件本身不留副本。
+    单个文件失败不影响其它文件，逐个返回结果。
+    """
+    items, errors = [], []
+    for f in files:
+        name = f.filename or "未命名"
+        try:
+            data = await f.read()
+            items.append(docs.parse(name, data))
+        except docs.DocError as e:
+            log.warning("附件解析失败 %s: %s", name, e)
+            errors.append({"name": name, "error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            log.exception("附件解析异常 %s", name)
+            errors.append({"name": name, "error": f"{type(e).__name__}: {e}"})
+    if items:
+        log.info("附件解析完成 %d 个：%s", len(items), docs.summarize(items))
+    return {"items": items, "errors": errors}
+
+
+# ============================ 提示词预设 ============================
+@app.get("/api/presets")
+def api_presets() -> dict:
+    return {"items": storage.list_presets()}
+
+
+@app.post("/api/presets")
+def api_save_preset(req: PresetReq) -> dict:
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(400, "预设名不能为空")
+    p = storage.save_preset(name, req.content, req.params, req.id)
+    log.info("保存预设 %s(%s) %d字", name, p["id"], len(req.content))
+    return p
+
+
+@app.delete("/api/presets/{pid}")
+def api_del_preset(pid: str) -> dict:
+    storage.delete_preset(pid)
     return {"ok": True}
 
 
@@ -406,31 +504,50 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
         raise HTTPException(400, str(e))
 
     cid = req.conversation_id
+    user_mid = ""
     if req.save:
         if not cid or not storage.get_conversation(cid):
             cid = storage.create_conversation(req.model, req.system_prompt, req.params)["id"]
-        storage.add_message(cid, "user", req.message, req.images)
+        user_mid = storage.add_message(cid, "user", req.message, req.images,
+                                       attachments=req.attachments)["id"]
         history = storage.get_conversation(cid)["messages"]
     else:
-        history = [{"role": "user", "content": req.message, "images": req.images}]
+        history = [{"role": "user", "content": req.message, "images": req.images,
+                    "attachments": req.attachments}]
 
-    msgs = [{"role": m["role"], "content": m["content"], "images": m.get("images") or []}
-            for m in history]
+    # 附件正文拼在对应那条消息后面。历史里的附件也一并带上，
+    # 否则第二轮追问「刚才那份 PPT 里…」模型就看不到了。
+    msgs = []
+    for m in history:
+        content = m["content"]
+        block = docs.as_prompt(m.get("attachments") or [])
+        if block:
+            content = (content + "\n\n" + block) if content.strip() else block
+        msgs.append({"role": m["role"], "content": content,
+                     "images": m.get("images") or []})
     params = dict(req.params)
     params["system_prompt"] = req.system_prompt
     params["tools"] = [t for t in req.tools if t in toolkit.SPECS]
 
     meta = find_model_meta(prov.id, model_id, "chat")
     with logctx.bind(conv=cid, model=req.model):
-        log.info("对话开始 模型=%s(%s) 历史=%d条 图片=%d张 工具=%s 系统提示词=%d字 参数=%s",
+        if req.images and not meta.get("vision"):
+            # 纯文本模型会把图片部分丢掉，然后回答"我没看到图片"。
+            # 前端已经拦了一道，这里留一条日志，方便排查"图明明发了却说没有"。
+            log.warning("该模型未标记 vision，收到 %d 张图片很可能被忽略；"
+                        "换视觉模型，或在 config.yaml 给它加 vision: true", len(req.images))
+        log.info("对话开始 模型=%s(%s) 历史=%d条 图片=%d张 附件=%s 工具=%s 系统提示词=%d字 参数=%s",
                  meta.get("name") or model_id, model_id, len(msgs), len(req.images),
+                 docs.summarize(req.attachments) or "无",
                  params["tools"] or "无", len(req.system_prompt or ""),
                  preview({k: v for k, v in req.params.items() if k != "tools"}))
 
     async def gen():
         logctx.set_ctx(conv=cid, model=req.model)
-        yield _sse({"type": "start", "conversation_id": cid, "model": req.model})
+        yield _sse({"type": "start", "conversation_id": cid, "model": req.model,
+                    "user_message_id": user_mid})
         buf, think, trace = [], [], []
+        sent: dict[str, str] = {}      # 落库后的 assistant 消息 id，随 end 事件回给前端
         t0 = time.perf_counter()
         try:
             async for ev in prov.chat_stream(model_id, msgs, params):
@@ -444,6 +561,15 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
                     log.info("工具结果 %s", preview(ev.get("summary")))
                     trace.append(f"{ev['name']}: {ev.get('summary', '')}")
                 yield _sse(ev)
+        except asyncio.CancelledError:
+            # 用户点了「停止」→ 前端断开连接。已经生成的部分要留下来，
+            # 不然点一次停止就白跑了一轮 token。
+            text = "".join(buf)
+            log.info("对话被中断 已输出%d字 用时%.1fs", len(text), time.perf_counter() - t0)
+            if req.save and cid and text.strip():
+                storage.add_message(cid, "assistant", text + "\n\n*（已手动停止）*",
+                                    reasoning="".join(think), model=req.model, tools=trace)
+            raise
         except ProviderError as e:
             log.error("对话失败 用时%.1fs: %s", time.perf_counter() - t0, e)
             yield _sse({"type": "error", "message": str(e)})
@@ -456,9 +582,11 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
                      len(text), len("".join(think)), len(trace),
                      time.perf_counter() - t0)
             if req.save and cid:
-                storage.add_message(cid, "assistant", text, reasoning="".join(think),
-                                    model=req.model, tools=trace)
-        yield _sse({"type": "end", "conversation_id": cid})
+                msg = storage.add_message(cid, "assistant", text, reasoning="".join(think),
+                                          model=req.model, tools=trace)
+                sent["mid"] = msg["id"]
+        yield _sse({"type": "end", "conversation_id": cid,
+                    "message_id": sent.get("mid", ""), "user_message_id": user_mid})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",
@@ -467,42 +595,71 @@ async def api_chat(req: ChatReq) -> StreamingResponse:
 
 # ============================ 图片生成 ============================
 @app.post("/api/image")
-async def api_image(req: ImageReq) -> dict:
+async def api_image(req: ImageReq, bg: BackgroundTasks, wait: bool = False) -> dict:
+    """提交出图任务。
+
+    默认异步：立刻返回 pending 的 job，真正的生成在后台跑，前端轮询
+    /api/jobs/{id} 看进度——这样关掉页面、网络抖动都不会把任务弄丢。
+    wait=true 走同步模式（老行为，脚本里一次性调用比较省事）。
+    """
     try:
         prov, model_id = providers.resolve(req.model)
     except Exception as e:
         raise HTTPException(400, str(e))
-    refs = ref_images(req.params)
     meta = find_model_meta(prov.id, model_id, "image")
-    allowed = [str(s) for s in (meta.get("sizes") or [])]
-    size = str(req.params.get("size") or "")
-    job = storage.create_job("image", prov.id, model_id, req.prompt, req.params)
-    storage.update_job(job["id"], status="running")
+    # 参考图张数上限：模型的 max_images 和服务商硬限制取小（0 = 不限）
+    limits = [n for n in (int(meta.get("max_images") or 0), prov.max_ref_images) if n > 0]
+    params_in, dropped = limit_refs(req.params, min(limits) if limits else 0)
+    job = storage.create_job("image", prov.id, model_id, req.prompt, params_in)
+    if not wait:
+        bg.add_task(_run_image, job["id"], prov.id, model_id, req.model, req.prompt,
+                    params_in, meta, dropped)
+        log.info("出图任务已受理 job=%s，转后台执行", job["id"])
+        return storage.get_job(job["id"])
+    await _run_image(job["id"], prov.id, model_id, req.model, req.prompt,
+                     params_in, meta, dropped, raise_http=True)
+    return storage.get_job(job["id"])
 
-    with logctx.bind(job=job["id"], model=req.model):
+
+async def _run_image(jid: str, pid: str, model_id: str, ref: str, prompt: str,
+                     params_in: dict, meta: dict, dropped: int = 0,
+                     raise_http: bool = False) -> None:
+    prov = providers.build(pid)
+    refs = ref_images(params_in)
+    allowed = [str(s) for s in (meta.get("sizes") or [])]
+    size = str(params_in.get("size") or "")
+    storage.update_job(jid, status="running")
+
+    with logctx.bind(job=jid, model=ref):
+        if dropped:
+            log.warning("该模型最多支持 %d 张参考图，多出的 %d 张已忽略",
+                        len(refs), dropped)
         if allowed and size and size not in allowed:
             log.warning("出图尺寸 %s 不在该模型支持列表 %s 内，仍按请求发出", size, allowed)
-        log.info("出图开始 模型=%s(%s) 尺寸=%s 数量=%s 参考图%d张 prompt=%s 其它参数=%s",
+        log.info("出图开始 模型=%s(%s) 尺寸=%s 数量=%s 参考图%d张(%s) prompt=%s 其它参数=%s",
                  meta.get("name") or model_id, model_id, size or "默认",
-                 req.params.get("n", 1), len(refs), preview(req.prompt, 300),
-                 preview({k: v for k, v in req.params.items()
+                 params_in.get("n", 1), len(refs),
+                 ("经COS公网URL" if prov.ref_mode == "url" else "直传base64") if refs else "无",
+                 preview(prompt, 300),
+                 preview({k: v for k, v in params_in.items()
                           if k not in ("images", "image_url", "size", "n")}))
         t0 = time.perf_counter()
         try:
             # 只认公网 URL 的服务商：参考图先经 COS 上传成临时预签名 URL，
             # 退出这个 with 时（无论成功失败）临时对象立刻删除。
-            async with cos.public_refs(req.params, prov.public_url_refs) as p:
-                urls = await prov.generate_image(model_id, req.prompt, p)
+            async with cos.public_refs(params_in, prov.ref_mode == "url") as p:
+                urls = await prov.generate_image(model_id, prompt, p)
         except Exception as e:  # noqa: BLE001
             log.error("出图失败 用时%.1fs: %s", time.perf_counter() - t0, e)
-            storage.update_job(job["id"], status="failed", error=str(e))
-            raise HTTPException(502, str(e))
+            storage.update_job(jid, status="failed", error=str(e))
+            if raise_http:
+                raise HTTPException(502, str(e))
+            return
         log.info("上游返回 %d 张，开始落盘", len(urls))
         local = [await _persist(u, "png", "image") for u in urls]
         log.info("出图成功 用时%.1fs 共%d张 %s", time.perf_counter() - t0, len(local),
                  "; ".join(_describe(u, "image") for u in local))
-        storage.update_job(job["id"], status="succeeded", result=local)
-    return storage.get_job(job["id"])
+        storage.update_job(jid, status="succeeded", result=local)
 
 
 def _describe(url: str, kind: str) -> str:
@@ -535,7 +692,7 @@ async def api_video(req: VideoReq, bg: BackgroundTasks) -> dict:
         cos_keys: list[str] = []
         params = req.params
         try:
-            if prov.public_url_refs and any(
+            if prov.ref_mode == "url" and any(
                     is_data_url(u) for u in ref_images(req.params)):
                 params, cos_keys = await cos.upload_refs(req.params)
             remote = await prov.submit_video(model_id, req.prompt, params)

@@ -9,6 +9,8 @@ from typing import Any, AsyncIterator
 import httpx
 
 from ..logging_setup import preview
+from .retry import RetryTransport
+from .retry import settings as retry_settings
 
 TIMEOUT = httpx.Timeout(connect=15.0, read=300.0, write=60.0, pool=15.0)
 log = logging.getLogger("aihub.provider")
@@ -23,6 +25,30 @@ class BaseProvider:
     # True = 该服务商的图片入参只认公网 URL，不吃 base64。
     # 本地上传的图会先经腾讯云 COS 转成临时预签名 URL（见 app/cos.py）。
     public_url_refs = False
+    # True = 即使 public_url_refs 也照样能吃 base64（实测过才置 True）。
+    # 这类服务商在 COS 关掉/没配时会自动降级为直传 base64，而不是报错。
+    base64_refs_ok = False
+    # 服务商对参考图张数的硬限制，0 = 不限/未知。
+    # 模型级别的限制写在 config.yaml 的 max_images，两者取小。
+    max_ref_images = 0
+
+    @property
+    def ref_mode(self) -> str:
+        """参考图怎么送给服务商："url"（经 COS 转公网链接）还是 "base64"（直传）。
+
+        config.yaml 里给该 provider 写 ref_mode: base64 / url 可强制指定；
+        不写（或 auto）时：本来就吃 base64 的 → base64；
+        只认 URL 的 → 有 COS 就用 COS，COS 关掉且实测能吃 base64 的降级直传。
+        """
+        want = str(self.conf.get("ref_mode") or "auto").lower()
+        if want in ("base64", "url"):
+            return want
+        if not self.public_url_refs:
+            return "base64"
+        from .. import cos                      # 延迟导入避免循环
+        if self.base64_refs_ok and not cos.is_configured():
+            return "base64"
+        return "url"
 
     def __init__(self, conf: dict[str, Any]):
         self.conf = conf
@@ -48,9 +74,15 @@ class BaseProvider:
 
     # --- 工具 ---
     def client(self, **kw) -> httpx.AsyncClient:
-        """带日志钩子的 httpx client：每个上游请求/响应都会记到日志文件。"""
+        """带日志钩子 + 自动重试的 httpx client。
+
+        重试放在 transport 层，所以对话/出图/视频/轮询全都覆盖到了，
+        策略见 app/providers/retry.py 和 config.yaml 的 retry 段。
+        """
         hooks = {"request": [self._on_request], "response": [self._on_response]}
         kw.setdefault("event_hooks", hooks)
+        kw.setdefault("transport", RetryTransport(
+            httpx.AsyncHTTPTransport(), self.conf, self.id))
         return httpx.AsyncClient(timeout=TIMEOUT, **kw)
 
     async def _on_request(self, request: httpx.Request) -> None:
@@ -115,8 +147,15 @@ class BaseProvider:
             "Google Gemini Flash Image，或 OpenAI 兼容接口的图片编辑模型。"
         )
 
-    @staticmethod
-    def check(resp: httpx.Response) -> dict:
+    def check(self, resp: httpx.Response) -> dict:
+        """非 2xx 一律变成人话错误；限流额外说明已经重试过、下一步怎么办。"""
+        if resp.status_code == 429:
+            n = retry_settings(self.conf)["attempts"]
+            raise ProviderError(
+                f"{self.name} 限流（HTTP 429）"
+                + (f"，已自动重试 {n - 1} 次仍未通过" if n > 1 else "")
+                + f"：{resp.text[:400]}。可以等一会儿再试，或换用其它服务商的同类模型。"
+            )
         if resp.status_code >= 400:
             raise ProviderError(f"HTTP {resp.status_code}: {resp.text[:600]}")
         return resp.json()
@@ -139,3 +178,16 @@ def ref_images(params: dict) -> list[str]:
     if not imgs and params.get("image_url"):
         imgs = [params["image_url"]]
     return imgs
+
+
+def limit_refs(params: dict, limit: int) -> tuple[dict, int]:
+    """把参考图裁到 limit 张，返回 (新 params, 被丢掉的张数)。
+
+    limit<=0 表示不限。前端已按 max_images 拦过一次，这里是服务端兜底，
+    免得多出来的图被服务商静默忽略、或者直接 400。
+    """
+    refs = ref_images(params)
+    if limit <= 0 or len(refs) <= limit:
+        return params, 0
+    kept = refs[:limit]
+    return {**params, "images": kept, "image_url": kept[0]}, len(refs) - len(kept)

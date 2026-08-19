@@ -201,7 +201,8 @@ async def upload_refs(params: dict) -> tuple[dict, list[str]]:
         raise CosError(
             "该服务商只接受公网图片 URL，需要先配置腾讯云 COS 作为临时图床："
             "在 config.yaml 的 cos 段填 secret_id / secret_key / region / bucket"
-            f"（当前缺少: {', '.join(missing_fields())}）"
+            f"（当前缺少: {', '.join(missing_fields()) or 'enabled: false 显式关掉了'}）。"
+            "如果该服务商其实也收 base64，可以给它加 ref_mode: base64 直传，不用 COS"
         )
     keys: list[str] = []
     out: list[str] = []
